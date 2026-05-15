@@ -163,11 +163,10 @@ public static class IconAppearanceService
             && edgeOpacity >= 0.56;
         var fullBleed = canvasRatio >= 0.9 && fillRatio >= 0.84 && !transparentCorners;
         var roundedSquare = canvasRatio >= 0.78
-            && fillRatio >= 0.6
-            && edgeOpacity >= 0.5
-            && roundedFit.Coverage >= 0.84
-            && roundedFit.Leak <= 0.08
-            && roundedFit.BandCoverage >= 0.68
+            && fillRatio >= 0.58
+            && edgeOpacity >= 0.48
+            && roundedFit.MissingInside <= 0.07
+            && roundedFit.OutsideLeak <= 0.04
             && !circleLike;
         var organicShape = circleLike || (transparentCorners && fillRatio < 0.84);
         var needsBacking = organicShape || (!fullBleed && !roundedSquare && (fillRatio < 0.82 || canvasRatio < 0.84));
@@ -185,9 +184,42 @@ public static class IconAppearanceService
 
     private static ShapeFit GetRoundedSquareFit(byte[] pixels, int stride, int startX, int startY, int width, int height)
     {
-        var radius = Math.Max(4.0, Math.Min(width, height) * 0.22);
+        var best = new ShapeFit(1, 1);
+        var scales = new[] { 1.0, 0.96, 0.92 };
+        var radiusFactors = new[] { 0.06, 0.16, 0.26 };
+
+        foreach (var scale in scales)
+        {
+            foreach (var radiusFactor in radiusFactors)
+            {
+                var fit = GetMaskFit(pixels, stride, startX, startY, width, height, scale, radiusFactor);
+                if (fit.TotalError < best.TotalError)
+                {
+                    best = fit;
+                }
+            }
+        }
+
+        return best;
+    }
+
+    private static ShapeFit GetMaskFit(
+        byte[] pixels,
+        int stride,
+        int startX,
+        int startY,
+        int width,
+        int height,
+        double scale,
+        double radiusFactor)
+    {
+        var maskWidth = width * scale;
+        var maskHeight = height * scale;
+        var offsetX = (width - maskWidth) * 0.5;
+        var offsetY = (height - maskHeight) * 0.5;
+        var radius = Math.Max(2.0, Math.Min(maskWidth, maskHeight) * radiusFactor);
         var maskPixels = 0;
-        var visibleInside = 0;
+        var missingInside = 0;
         var visibleOutside = 0;
         var visibleTotal = 0;
 
@@ -196,57 +228,34 @@ public static class IconAppearanceService
             for (var x = 0; x < width; x++)
             {
                 var isVisible = pixels[(startY + y) * stride + (startX + x) * 4 + 3] >= 24;
-                var inMask = IsInsideRoundedRect(x + 0.5, y + 0.5, width, height, radius);
+                var inMask = IsInsideRoundedRect(
+                    x + 0.5 - offsetX,
+                    y + 0.5 - offsetY,
+                    maskWidth,
+                    maskHeight,
+                    radius);
 
-                if (inMask) maskPixels++;
                 if (isVisible) visibleTotal++;
-                if (isVisible && inMask) visibleInside++;
-                if (isVisible && !inMask) visibleOutside++;
+                if (inMask)
+                {
+                    maskPixels++;
+                    if (!isVisible) missingInside++;
+                }
+                else if (isVisible)
+                {
+                    visibleOutside++;
+                }
             }
         }
 
         if (maskPixels == 0 || visibleTotal == 0)
         {
-            return new ShapeFit(0, 1, 0);
+            return new ShapeFit(1, 1);
         }
 
         return new ShapeFit(
-            visibleInside / (double)maskPixels,
-            visibleOutside / (double)visibleTotal,
-            GetBandCoverage(pixels, stride, startX, startY, width, height));
-    }
-
-    private static double GetBandCoverage(byte[] pixels, int stride, int startX, int startY, int width, int height)
-    {
-        var rows = new[] { 0.22, 0.35, 0.5, 0.65, 0.78 };
-        var columns = new[] { 0.22, 0.35, 0.5, 0.65, 0.78 };
-        var minCoverage = 1.0;
-
-        foreach (var row in rows)
-        {
-            var y = startY + Math.Clamp((int)Math.Round((height - 1) * row), 0, height - 1);
-            var visible = 0;
-            for (var x = startX; x < startX + width; x++)
-            {
-                if (pixels[y * stride + x * 4 + 3] >= 24) visible++;
-            }
-
-            minCoverage = Math.Min(minCoverage, visible / (double)width);
-        }
-
-        foreach (var column in columns)
-        {
-            var x = startX + Math.Clamp((int)Math.Round((width - 1) * column), 0, width - 1);
-            var visible = 0;
-            for (var y = startY; y < startY + height; y++)
-            {
-                if (pixels[y * stride + x * 4 + 3] >= 24) visible++;
-            }
-
-            minCoverage = Math.Min(minCoverage, visible / (double)height);
-        }
-
-        return minCoverage;
+            missingInside / (double)maskPixels,
+            visibleOutside / (double)visibleTotal);
     }
 
     private static bool IsInsideRoundedRect(double x, double y, double width, double height, double radius)
@@ -454,7 +463,10 @@ public static class IconAppearanceService
     }
 
     private sealed record HslColor(double Hue, double Saturation, double Lightness);
-    private sealed record ShapeFit(double Coverage, double Leak, double BandCoverage);
+    private sealed record ShapeFit(double MissingInside, double OutsideLeak)
+    {
+        public double TotalError => MissingInside + OutsideLeak * 1.8;
+    }
     private sealed record IconAnalysis(bool IsFullBleed, bool IsRoundedSquare, bool NeedsBacking, Color BackingColor, Int32Rect ContentBounds);
 }
 
