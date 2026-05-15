@@ -432,7 +432,6 @@ public class WindowService
         Debug.WriteLine($"[GetIconFromAumid] Attempting to get icon for AUMID: {aumid}");
 
         NativeMethods.IShellItem2? shellItem = null;
-        IntPtr hBitmap = IntPtr.Zero;
         try
         {
             int hr = NativeMethods.SHCreateItemInKnownFolder(NativeMethods.AppsFolder, 0, aumid,
@@ -449,21 +448,14 @@ public class WindowService
                 title = displayName;
 
             var imageFactory = (NativeMethods.IShellItemImageFactory)shellItem;
-            var size = new NativeMethods.SIZE { cx = 256, cy = 256 };
-            hr = imageFactory.GetImage(size, NativeMethods.SIIGBF.ICONONLY, out hBitmap);
-
-            if (hr == 0 && hBitmap != IntPtr.Zero)
+            var icon = GetBestIconFromFactory(imageFactory);
+            if (icon != null)
             {
                 Debug.WriteLine($"[GetIconFromAumid] Icon successfully obtained for AUMID: {aumid}");
-                var bmp = Imaging.CreateBitmapSourceFromHBitmap(hBitmap, IntPtr.Zero, Int32Rect.Empty,
-                    BitmapSizeOptions.FromEmptyOptions());
-                bmp.Freeze();
-                return bmp;
+                return icon;
             }
-            else
-            {
-                Debug.WriteLine($"[GetIconFromAumid] imageFactory.GetImage failed with HRESULT: {hr:X}");
-            }
+
+            Debug.WriteLine("[GetIconFromAumid] No icon candidate could be selected.");
         }
         catch (Exception ex)
         {
@@ -471,7 +463,6 @@ public class WindowService
         }
         finally
         {
-            if (hBitmap != IntPtr.Zero) NativeMethods.DeleteObject(hBitmap);
             if (shellItem != null) Marshal.ReleaseComObject(shellItem);
         }
         return null;
@@ -490,14 +481,7 @@ public class WindowService
 
             if (hr == 0 && shellItem is NativeMethods.IShellItemImageFactory factory)
             {
-                var sz = new NativeMethods.SIZE { cx = size, cy = size };
-                if (factory.GetImage(sz, NativeMethods.SIIGBF.ICONONLY, out hBitmap) == 0 && hBitmap != IntPtr.Zero)
-                {
-                    var bmp = Imaging.CreateBitmapSourceFromHBitmap(hBitmap, IntPtr.Zero, Int32Rect.Empty,
-                        BitmapSizeOptions.FromEmptyOptions());
-                    bmp.Freeze();
-                    return bmp;
-                }
+                return GetBestIconFromFactory(factory, size);
             }
         }
         catch (Exception ex)
@@ -510,6 +494,53 @@ public class WindowService
             if (shellItem != null) Marshal.ReleaseComObject(shellItem);
         }
         return null;
+    }
+
+    private static BitmapSource? GetBestIconFromFactory(NativeMethods.IShellItemImageFactory factory, int preferredSize = 256)
+    {
+        var sizes = new[] { preferredSize, 256, 128, 96, 64, 48, 32 }
+            .Distinct()
+            .Where(size => size > 0)
+            .ToArray();
+        BitmapSource? bestIcon = null;
+        var bestScore = double.MinValue;
+
+        foreach (var candidateSize in sizes)
+        {
+            IntPtr hBitmap = IntPtr.Zero;
+            try
+            {
+                var size = new NativeMethods.SIZE { cx = candidateSize, cy = candidateSize };
+                if (factory.GetImage(size, NativeMethods.SIIGBF.ICONONLY, out hBitmap) != 0 || hBitmap == IntPtr.Zero)
+                {
+                    continue;
+                }
+
+                var bitmap = Imaging.CreateBitmapSourceFromHBitmap(
+                    hBitmap,
+                    IntPtr.Zero,
+                    Int32Rect.Empty,
+                    BitmapSizeOptions.FromEmptyOptions());
+                bitmap.Freeze();
+
+                var score = IconAppearanceService.GetSelectionScore(bitmap);
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    bestIcon = bitmap;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[GetBestIconFromFactory] Candidate {candidateSize}px failed: {ex.Message}");
+            }
+            finally
+            {
+                if (hBitmap != IntPtr.Zero) NativeMethods.DeleteObject(hBitmap);
+            }
+        }
+
+        return bestIcon;
     }
 
     private static BitmapSource? GetSystemIcon(IntPtr hWnd)
