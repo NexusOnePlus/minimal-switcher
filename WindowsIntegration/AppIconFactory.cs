@@ -70,15 +70,15 @@ internal static class AppIconFactory
         using var shadowBrush = new Drawing.SolidBrush(Drawing.Color.FromArgb(70, 0, 0, 0));
         using var ringPen = new Drawing.Pen(Drawing.Color.FromArgb(90, 255, 255, 255), 2f * scale);
 
-        using var shadow = RoundedRect(8 * scale, 10 * scale, 48 * scale, 48 * scale, 15 * scale);
+        using var shadow = RoundedRect(4 * scale, 6 * scale, 56 * scale, 56 * scale, 18 * scale);
         graphics.FillPath(shadowBrush, shadow);
 
-        using var shell = RoundedRect(8 * scale, 7 * scale, 48 * scale, 48 * scale, 15 * scale);
+        using var shell = RoundedRect(3 * scale, 3 * scale, 58 * scale, 58 * scale, 18 * scale);
         graphics.FillPath(shellBrush, shell);
         graphics.DrawPath(ringPen, shell);
 
-        using var topBar = RoundedRect(18 * scale, 20 * scale, 28 * scale, 8 * scale, 4 * scale);
-        using var bottomBar = RoundedRect(18 * scale, 36 * scale, 28 * scale, 8 * scale, 4 * scale);
+        using var topBar = RoundedRect(14 * scale, 19 * scale, 36 * scale, 10 * scale, 5 * scale);
+        using var bottomBar = RoundedRect(14 * scale, 35 * scale, 36 * scale, 10 * scale, 5 * scale);
         graphics.FillPath(accentBrush, topBar);
         graphics.FillPath(accentBrush, bottomBar);
 

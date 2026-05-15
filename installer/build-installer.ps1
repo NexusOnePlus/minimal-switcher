@@ -1,6 +1,7 @@
 param(
     [string]$Configuration = "Release",
     [string]$Runtime = "win-x64",
+    [string]$Version = "",
     [string]$InnoCompiler = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
 )
 
@@ -17,9 +18,12 @@ if (-not (Test-Path $InnoCompiler)) {
 }
 
 [xml]$projectXml = Get-Content $project
-$version = $projectXml.Project.PropertyGroup.Version
-if ([string]::IsNullOrWhiteSpace($version)) {
-    $version = "0.1.0"
+if ([string]::IsNullOrWhiteSpace($Version)) {
+    $Version = $projectXml.Project.PropertyGroup.Version
+}
+
+if ([string]::IsNullOrWhiteSpace($Version)) {
+    $Version = "0.1.0"
 }
 
 New-Item -ItemType Directory -Force $publishDir, $installerDir | Out-Null
@@ -28,12 +32,14 @@ dotnet publish $project `
     -c $Configuration `
     -r $Runtime `
     --self-contained false `
+    -p:Version=$Version `
+    -p:InformationalVersion=$Version `
     -p:PublishSingleFile=false `
     -p:DebugType=None `
     -p:DebugSymbols=false `
     -o $publishDir
 
-$env:APP_VERSION = $version
+$env:APP_VERSION = $Version
 $env:PUBLISH_DIR = $publishDir
 $env:INSTALLER_OUTPUT_DIR = $installerDir
 

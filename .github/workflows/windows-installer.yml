@@ -1,0 +1,72 @@
+name: Windows Installer
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to package, for example 0.1.0"
+        required: false
+        type: string
+  push:
+    branches:
+      - master
+      - main
+    tags:
+      - "v*"
+  pull_request:
+    branches:
+      - master
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  build-installer:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          $version = "${{ inputs.version }}"
+          if (-not $version -and "${{ github.ref_type }}" -eq "tag") {
+            $version = "${{ github.ref_name }}".TrimStart("v")
+          }
+
+          if ($version) {
+            .\installer\build-installer.ps1 -Version $version
+          } else {
+            .\installer\build-installer.ps1
+          }
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: minimal-switcher-installer
+          path: artifacts/installer/*.exe
+
+      - name: Publish GitHub Release asset
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $installer = Get-ChildItem artifacts/installer/*.exe | Select-Object -First 1
+          gh release view "${{ github.ref_name }}" *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create "${{ github.ref_name }}" --title "${{ github.ref_name }}" --notes "Release ${{ github.ref_name }}"
+          }
+          gh release upload "${{ github.ref_name }}" $installer.FullName --clobber
