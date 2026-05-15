@@ -184,9 +184,7 @@ public class WindowService
 
         var wi = new WindowItem { Hwnd = hWnd, Title = title };
 
-        NativeMethods.GetWindowThreadProcessId(hWnd, out var framePid);
-        wi.ProcessId = framePid;
-        wi.RealProcessId = GetRealProcessId(hWnd);
+        wi.ProcessId = GetRealProcessId(hWnd);
 
         var (type, identifier) = GetAndCacheIdentifier(hWnd);
         if (!string.IsNullOrEmpty(identifier))
