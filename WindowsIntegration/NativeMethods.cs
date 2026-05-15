@@ -167,6 +167,9 @@ internal static class NativeMethods
     public static extern bool CloseHandle(IntPtr hObject);
 
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    public static extern bool QueryFullProcessImageName(SafeProcessHandle hProcess, int dwFlags, [Out] StringBuilder lpExeName, ref int lpdwSize);
+
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     public static extern int GetApplicationUserModelId(IntPtr hProcess, ref int appUserModelIDLength, [Out] StringBuilder appUserModelID);
 
     [DllImport("user32.dll")]

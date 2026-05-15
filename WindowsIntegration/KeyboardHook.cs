@@ -92,16 +92,11 @@ class KeyboardHook
 
                 if (_isAltDown && (isAltTab || isSameProcessShortcut) && !isKeyRepeat && !_isCustomAltTabActive)
                 {
-                    var foregroundHwnd = NativeMethods.GetForegroundWindow();
-                    if (IsCurrentProcessWindow(foregroundHwnd))
-                    {
-                        return CallNextHookEx(_hookID, nCode, wParam, lParam);
-                    }
-
                     _isCustomAltTabActive = true;
                     var filter = isSameProcessShortcut ? SwitcherFilter.SameProcess : SwitcherFilter.AllWindows;
                     Debug.WriteLine($"[HOOK] Custom Alt sequence STARTED ({filter})");
 
+                    var foregroundHwnd = NativeMethods.GetForegroundWindow();
                     Application.Current?.Dispatcher.Invoke(() => Switcher.Begin(foregroundHwnd, filter));
                     return (IntPtr)1;
                 }

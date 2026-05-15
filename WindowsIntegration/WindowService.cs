@@ -267,7 +267,12 @@ public class WindowService
     {
         if (NativeMethods.GetWindowTextLength(hWnd) == 0) return false;
 
-        if (NativeMethods.GetWindow(hWnd, NativeMethods.GW_OWNER) != IntPtr.Zero) return false;
+        IntPtr owner = NativeMethods.GetWindow(hWnd, NativeMethods.GW_OWNER);
+        if (owner != IntPtr.Zero)
+        {
+            long exStyleApp = NativeMethods.GetWindowLong(hWnd, NativeMethods.GWL_EXSTYLE);
+            if ((exStyleApp & 0x00040000) == 0) return false; // WS_EX_APPWINDOW
+        }
 
         long exStyle = NativeMethods.GetWindowLong(hWnd, NativeMethods.GWL_EXSTYLE);
         if ((exStyle & NativeMethods.WS_EX_TOOLWINDOW) != 0) return false;
@@ -361,8 +366,8 @@ public class WindowService
             {
                 if (handle.IsInvalid)
                 {
-                    Debug.WriteLine($"[GetIdentifier] OpenProcess failed for PID: {pid}. Attempting to get executable path.");
-                    return (AppType.Path, GetPathForDesktopApp(pid));
+                    Debug.WriteLine($"[GetIdentifier] OpenProcess failed for PID: {pid}.");
+                    return (AppType.Path, null);
                 }
 
                 int len = 1024;
@@ -387,16 +392,19 @@ public class WindowService
     private static string? GetPathForDesktopApp(uint pid)
     {
         if (pid == 0) return null;
-        try
+        
+        using (var handle = NativeMethods.OpenProcess(NativeMethods.ProcessAccessFlags.QueryLimitedInformation, false, (int)pid))
         {
-            using var process = Process.GetProcessById((int)pid);
-            return process.MainModule?.FileName;
+            if (handle.IsInvalid) return null;
+
+            var sb = new StringBuilder(1024);
+            int size = sb.Capacity;
+            if (NativeMethods.QueryFullProcessImageName(handle, 0, sb, ref size))
+            {
+                return sb.ToString();
+            }
         }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[GetPathForDesktopApp] Could not get path for PID {pid}: {ex.Message}");
-            return null;
-        }
+        return null;
     }
 
     private static uint GetRealProcessId(IntPtr hWnd)
@@ -406,25 +414,22 @@ public class WindowService
 
         try
         {
-            using var initialProc = Process.GetProcessById((int)initialPid);
-            if (initialProc.ProcessName.Equals("ApplicationFrameHost", StringComparison.OrdinalIgnoreCase))
+            var sb = new StringBuilder(256);
+            NativeMethods.GetClassName(hWnd, sb, sb.Capacity);
+            if (sb.ToString().Equals("ApplicationFrameWindow", StringComparison.OrdinalIgnoreCase))
             {
-                Debug.WriteLine($"[GetRealProcessId] HWND {hWnd} belongs to ApplicationFrameHost (PID: {initialPid}). Searching for child process...");
+                Debug.WriteLine($"[GetRealProcessId] HWND {hWnd} is ApplicationFrameWindow. Searching for child process...");
                 foreach (var childHwnd in GetChildWindows(hWnd))
                 {
                     NativeMethods.GetWindowThreadProcessId(childHwnd, out uint childPid);
                     if (childPid != 0 && childPid != initialPid)
                     {
-                        Debug.WriteLine($"[GetRealProcessId] UWP child process found with PID: {childPid}");
                         return childPid;
                     }
                 }
             }
         }
-        catch (Exception ex)
-        {
-            Debug.WriteLine($"[GetRealProcessId] Exception while checking ApplicationFrameHost: {ex.Message}");
-        }
+        catch { }
 
         return initialPid;
     }
@@ -450,7 +455,12 @@ public class WindowService
 
     public static bool IsAppWindow(IntPtr hWnd)
     {
-        if (NativeMethods.GetWindow(hWnd, NativeMethods.GW_OWNER) != IntPtr.Zero) return false;
+        IntPtr owner = NativeMethods.GetWindow(hWnd, NativeMethods.GW_OWNER);
+        if (owner != IntPtr.Zero)
+        {
+            long exStyleApp = NativeMethods.GetWindowLong(hWnd, NativeMethods.GWL_EXSTYLE);
+            if ((exStyleApp & 0x00040000) == 0) return false; // WS_EX_APPWINDOW
+        }
 
         long exStyle = NativeMethods.GetWindowLong(hWnd, NativeMethods.GWL_EXSTYLE);
         if ((exStyle & NativeMethods.WS_EX_TOOLWINDOW) != 0) return false;
