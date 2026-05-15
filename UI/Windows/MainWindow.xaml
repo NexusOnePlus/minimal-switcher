@@ -54,6 +54,7 @@
                                     Background="#10FFFFFF"
                                     BorderBrush="#20FFFFFF"
                                     BorderThickness="1"
+                                    ClipToBounds="True"
                                     Cursor="Hand"
                                     MouseLeftButtonUp="IconBorder_MouseLeftButtonUp"
                                 >
@@ -61,7 +62,7 @@
                                         Source="{Binding Icon}"
                                         Width="64"
                                         Height="64"
-                                        Margin="12"
+                                        Margin="{Binding IconMargin}"
                                         Stretch="Uniform"
                                         RenderOptions.BitmapScalingMode="HighQuality"
                                     />

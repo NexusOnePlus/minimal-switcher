@@ -206,6 +206,37 @@
             </Setter>
         </Style>
 
+        <Style x:Key="ColorSwatchButton" TargetType="Button">
+            <Setter Property="Width" Value="28" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="#33FFFFFF" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Root"
+                                CornerRadius="10"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}">
+                            <Border CornerRadius="9"
+                                    BorderBrush="#2A000000"
+                                    BorderThickness="1" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Root" Property="BorderBrush" Value="#DDE6F4" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Root" Property="Opacity" Value="0.72" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="PresetTileButton" TargetType="Button">
             <Setter Property="Height" Value="92" />
             <Setter Property="Margin" Value="0,0,10,10" />
@@ -658,7 +689,7 @@
                                               Checked="IconTreatmentCheckBox_Changed"
                                               Unchecked="IconTreatmentCheckBox_Changed" />
 
-                                    <TextBlock Text="Color de tinte"
+                                    <TextBlock Text="Color base"
                                                Foreground="{StaticResource TextSecondary}"
                                                FontWeight="SemiBold"
                                                Margin="0,16,0,8" />
@@ -670,8 +701,34 @@
                                              BorderThickness="1"
                                              Padding="12,7"
                                              TextChanged="IconTintTextBox_TextChanged" />
+                                    <UniformGrid Columns="6" Margin="0,10,0,0">
+                                        <Button Style="{StaticResource ColorSwatchButton}"
+                                                Background="#8B5CF6"
+                                                Tag="#8B5CF6"
+                                                Click="IconColorSwatch_Click" />
+                                        <Button Style="{StaticResource ColorSwatchButton}"
+                                                Background="#38BDF8"
+                                                Tag="#38BDF8"
+                                                Click="IconColorSwatch_Click" />
+                                        <Button Style="{StaticResource ColorSwatchButton}"
+                                                Background="#22C55E"
+                                                Tag="#22C55E"
+                                                Click="IconColorSwatch_Click" />
+                                        <Button Style="{StaticResource ColorSwatchButton}"
+                                                Background="#F97316"
+                                                Tag="#F97316"
+                                                Click="IconColorSwatch_Click" />
+                                        <Button Style="{StaticResource ColorSwatchButton}"
+                                                Background="#F43F5E"
+                                                Tag="#F43F5E"
+                                                Click="IconColorSwatch_Click" />
+                                        <Button Style="{StaticResource ColorSwatchButton}"
+                                                Background="#F5F6F8"
+                                                Tag="#F5F6F8"
+                                                Click="IconColorSwatch_Click" />
+                                    </UniformGrid>
 
-                                    <TextBlock Text="Fuerza del tinte"
+                                    <TextBlock Text="Remapeo"
                                                Foreground="{StaticResource TextSecondary}"
                                                FontWeight="SemiBold"
                                                Margin="0,18,0,8" />

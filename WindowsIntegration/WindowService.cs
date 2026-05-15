@@ -30,7 +30,7 @@ public class WindowService
     private static readonly List<IntPtr> _windowHistory = new List<IntPtr>();
     private static readonly IgnoredWindowRegistry IgnoredWindows = IgnoredWindowRegistry.Instance;
     private static readonly NativeMethods.WinEventDelegate _winEventProc = new NativeMethods.WinEventDelegate(WinEventProc);
-    private static readonly Dictionary<string, ImageSource> _iconCache = new();
+    private static readonly Dictionary<string, IconAppearance> _iconCache = new();
     private static readonly Dictionary<IntPtr, (AppType Type, string Identifier)> _identifierCache = new();
     private static void WinEventProc(IntPtr hWinEventHook, uint eventType, IntPtr hwnd, int idObject, int idChild, uint dwEventThread, uint dwmsEventTime)
     {
@@ -167,7 +167,8 @@ public class WindowService
             var iconCacheKey = CreateIconCacheKey(identifier);
             if (_iconCache.TryGetValue(iconCacheKey, out var cachedIcon))
             {
-                wi.Icon = cachedIcon;
+                wi.Icon = cachedIcon.Source;
+                wi.IconMargin = cachedIcon.Margin;
             }
             else if (!NativeMethods.IsIconic(hWnd))
             {
@@ -184,16 +185,19 @@ public class WindowService
                 if (newIcon != null)
                 {
                     var processedIcon = IconAppearanceService.Apply(newIcon);
-                    if (processedIcon != null)
-                    {
-                        wi.Icon = processedIcon;
-                        _iconCache[iconCacheKey] = processedIcon;
-                    }
+                    wi.Icon = processedIcon.Source;
+                    wi.IconMargin = processedIcon.Margin;
+                    _iconCache[iconCacheKey] = processedIcon;
                 }
             }
         }
 
-        wi.Icon ??= IconAppearanceService.Apply(GetSystemIcon(hWnd));
+        if (wi.Icon == null)
+        {
+            var fallbackIcon = IconAppearanceService.Apply(GetSystemIcon(hWnd));
+            wi.Icon = fallbackIcon.Source;
+            wi.IconMargin = fallbackIcon.Margin;
+        }
         return wi;
     }
 

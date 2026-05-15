@@ -8,6 +8,7 @@ namespace minimal_switcher;
 public static class IconAppearanceService
 {
     private const int OutputSize = 128;
+    private static readonly Thickness DefaultMargin = new(12);
 
     public static string SettingsKey
     {
@@ -18,23 +19,23 @@ public static class IconAppearanceService
         }
     }
 
-    public static ImageSource? Apply(ImageSource? source)
+    public static IconAppearance Apply(ImageSource? source)
     {
-        if (source is not BitmapSource bitmapSource) return source;
+        if (source is not BitmapSource bitmapSource) return new IconAppearance(source, DefaultMargin);
 
         var settings = AppSettingsService.Instance.Current;
         if (settings.IconTreatmentMode == IconTreatmentMode.Native && settings.IconTintStrength == 0)
         {
-            return source;
+            return new IconAppearance(source, DefaultMargin);
         }
 
         try
         {
             var bitmap = EnsureBgra32(bitmapSource);
             var analysis = Analyze(bitmap);
-            var destination = new Rect(GetInset(analysis), GetInset(analysis),
-                OutputSize - GetInset(analysis) * 2,
-                OutputSize - GetInset(analysis) * 2);
+            var crop = CreateContentCrop(bitmap, analysis);
+            var iconInset = GetRenderedInset(analysis, settings);
+            var destination = new Rect(iconInset, iconInset, OutputSize - iconInset * 2, OutputSize - iconInset * 2);
 
             var visual = new DrawingVisual();
             using (var context = visual.RenderOpen())
@@ -46,28 +47,39 @@ public static class IconAppearanceService
                     context.DrawRoundedRectangle(backing, null, new Rect(8, 8, 112, 112), 30, 30);
                 }
 
-                context.DrawImage(bitmap, destination);
+                context.DrawImage(crop, destination);
             }
 
             var render = new RenderTargetBitmap(OutputSize, OutputSize, 96, 96, PixelFormats.Pbgra32);
             render.Render(visual);
             render.Freeze();
 
-            if (settings.IconTintStrength <= 0) return render;
+            var image = settings.IconTintStrength <= 0
+                ? render
+                : RemapPalette(render, settings.IconTintColor, settings.IconTintStrength);
 
-            return Tint(render, settings.IconTintColor, settings.IconTintStrength);
+            return new IconAppearance(image, GetLayoutMargin(analysis, settings));
         }
         catch
         {
-            return source;
+            return new IconAppearance(source, DefaultMargin);
         }
     }
 
-    private static double GetInset(IconAnalysis analysis)
+    private static double GetRenderedInset(IconAnalysis analysis, AppSettings settings)
     {
-        if (analysis.IsFullBleed) return 3;
-        if (analysis.NeedsBacking) return 20;
-        return 12;
+        if (settings.IconTreatmentMode != IconTreatmentMode.Unified) return 0;
+        if (analysis.IsFullBleed) return 0;
+        if (analysis.NeedsBacking) return 16;
+        return 6;
+    }
+
+    private static Thickness GetLayoutMargin(IconAnalysis analysis, AppSettings settings)
+    {
+        if (settings.IconTreatmentMode != IconTreatmentMode.Unified) return DefaultMargin;
+        if (analysis.IsFullBleed) return new Thickness(1);
+        if (analysis.NeedsBacking) return new Thickness(7);
+        return new Thickness(5);
     }
 
     private static BitmapSource EnsureBgra32(BitmapSource source)
@@ -130,7 +142,7 @@ public static class IconAppearanceService
 
         if (opaque == 0)
         {
-            return new IconAnalysis(false, false, Color.FromRgb(28, 32, 40));
+            return new IconAnalysis(false, false, Color.FromRgb(28, 32, 40), new Int32Rect(0, 0, source.PixelWidth, source.PixelHeight));
         }
 
         var boundsWidth = maxX - minX + 1;
@@ -141,13 +153,30 @@ public static class IconAppearanceService
         var needsBacking = !fullBleed && (fillRatio < 0.78 || canvasRatio < 0.82);
 
         var dominant = Color.FromRgb((byte)(red / opaque), (byte)(green / opaque), (byte)(blue / opaque));
-        return new IconAnalysis(fullBleed, needsBacking, CreateBackingColor(dominant));
+        var padding = needsBacking ? 2 : 0;
+        var crop = new Int32Rect(
+            Math.Max(0, minX - padding),
+            Math.Max(0, minY - padding),
+            Math.Min(source.PixelWidth - Math.Max(0, minX - padding), boundsWidth + padding * 2),
+            Math.Min(source.PixelHeight - Math.Max(0, minY - padding), boundsHeight + padding * 2));
+
+        return new IconAnalysis(fullBleed, needsBacking, CreateBackingColor(dominant), crop);
     }
 
-    private static BitmapSource Tint(BitmapSource source, string tintHex, int strength)
+    private static BitmapSource CreateContentCrop(BitmapSource source, IconAnalysis analysis)
+    {
+        if (analysis.IsFullBleed) return source;
+
+        var cropped = new CroppedBitmap(source, analysis.ContentBounds);
+        cropped.Freeze();
+        return cropped;
+    }
+
+    private static BitmapSource RemapPalette(BitmapSource source, string tintHex, int strength)
     {
         var tint = ParseColor(tintHex);
         var amount = Math.Clamp(strength / 100.0, 0, 1);
+        var target = RgbToHsl(tint.R, tint.G, tint.B);
         var stride = source.PixelWidth * 4;
         var pixels = new byte[stride * source.PixelHeight];
         source.CopyPixels(pixels, stride, 0);
@@ -157,9 +186,13 @@ public static class IconAppearanceService
             var alpha = pixels[index + 3];
             if (alpha == 0) continue;
 
-            pixels[index] = Blend(pixels[index], tint.B, amount);
-            pixels[index + 1] = Blend(pixels[index + 1], tint.G, amount);
-            pixels[index + 2] = Blend(pixels[index + 2], tint.R, amount);
+            var original = RgbToHsl(pixels[index + 2], pixels[index + 1], pixels[index]);
+            var saturation = Math.Clamp(Math.Max(original.Saturation, target.Saturation * 0.58), 0, 1);
+            var remapped = HslToRgb(target.Hue, saturation, original.Lightness);
+
+            pixels[index] = Blend(pixels[index], remapped.B, amount);
+            pixels[index + 1] = Blend(pixels[index + 1], remapped.G, amount);
+            pixels[index + 2] = Blend(pixels[index + 2], remapped.R, amount);
         }
 
         var result = BitmapSource.Create(
@@ -196,5 +229,77 @@ public static class IconAppearanceService
             Convert.ToByte(hex.Substring(5, 2), 16));
     }
 
-    private sealed record IconAnalysis(bool IsFullBleed, bool NeedsBacking, Color BackingColor);
+    private static HslColor RgbToHsl(byte red, byte green, byte blue)
+    {
+        var r = red / 255.0;
+        var g = green / 255.0;
+        var b = blue / 255.0;
+        var max = Math.Max(r, Math.Max(g, b));
+        var min = Math.Min(r, Math.Min(g, b));
+        var lightness = (max + min) / 2.0;
+
+        if (Math.Abs(max - min) < 0.0001)
+        {
+            return new HslColor(0, 0, lightness);
+        }
+
+        var delta = max - min;
+        var saturation = lightness > 0.5
+            ? delta / (2.0 - max - min)
+            : delta / (max + min);
+
+        double hue;
+        if (Math.Abs(max - r) < 0.0001)
+        {
+            hue = (g - b) / delta + (g < b ? 6 : 0);
+        }
+        else if (Math.Abs(max - g) < 0.0001)
+        {
+            hue = (b - r) / delta + 2;
+        }
+        else
+        {
+            hue = (r - g) / delta + 4;
+        }
+
+        return new HslColor(hue / 6.0, saturation, lightness);
+    }
+
+    private static Color HslToRgb(double hue, double saturation, double lightness)
+    {
+        if (saturation <= 0)
+        {
+            var gray = (byte)Math.Clamp(lightness * 255, 0, 255);
+            return Color.FromRgb(gray, gray, gray);
+        }
+
+        var q = lightness < 0.5
+            ? lightness * (1 + saturation)
+            : lightness + saturation - lightness * saturation;
+        var p = 2 * lightness - q;
+
+        return Color.FromRgb(
+            ToRgbChannel(p, q, hue + 1.0 / 3.0),
+            ToRgbChannel(p, q, hue),
+            ToRgbChannel(p, q, hue - 1.0 / 3.0));
+    }
+
+    private static byte ToRgbChannel(double p, double q, double value)
+    {
+        if (value < 0) value += 1;
+        if (value > 1) value -= 1;
+
+        double result;
+        if (value < 1.0 / 6.0) result = p + (q - p) * 6 * value;
+        else if (value < 1.0 / 2.0) result = q;
+        else if (value < 2.0 / 3.0) result = p + (q - p) * (2.0 / 3.0 - value) * 6;
+        else result = p;
+
+        return (byte)Math.Clamp(result * 255, 0, 255);
+    }
+
+    private sealed record HslColor(double Hue, double Saturation, double Lightness);
+    private sealed record IconAnalysis(bool IsFullBleed, bool NeedsBacking, Color BackingColor, Int32Rect ContentBounds);
 }
+
+public sealed record IconAppearance(ImageSource? Source, Thickness Margin);

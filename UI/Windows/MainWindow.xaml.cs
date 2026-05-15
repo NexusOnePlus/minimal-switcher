@@ -386,6 +386,7 @@ public partial class MainWindow : Window
                 Hwnd = w.Hwnd,
                 Title = w.Title,
                 Icon = w.Icon,
+                IconMargin = w.IconMargin,
                 IsSelected = false
             });
         }

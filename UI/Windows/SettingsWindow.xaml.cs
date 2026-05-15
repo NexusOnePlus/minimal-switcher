@@ -126,6 +126,13 @@ public partial class SettingsWindow : Window
         RefreshWindowLists();
     }
 
+    private void IconColorSwatch_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string color }) return;
+
+        IconTintTextBox.Text = color;
+    }
+
     private void IconTintSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         if (IconTintValueText == null) return;

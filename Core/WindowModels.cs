@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel;
+using System.Windows;
 using System.Windows.Media;
 
 namespace minimal_switcher;
@@ -19,6 +20,7 @@ public class WindowItem
     public uint ProcessId { get; set; }
     public bool IsIgnored { get; set; }
     public ImageSource? Icon { get; set; }
+    public Thickness IconMargin { get; set; } = new(12);
 }
 
 public class SwitcherItem : INotifyPropertyChanged
@@ -28,6 +30,7 @@ public class SwitcherItem : INotifyPropertyChanged
     public IntPtr Hwnd { get; set; }
     public string Title { get; set; } = string.Empty;
     public ImageSource? Icon { get; set; }
+    public Thickness IconMargin { get; set; } = new(12);
 
     public bool IsSelected
     {
