@@ -23,6 +23,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Remove="tools\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Resource Include="Shaders\GlassyEffect.ps" />
   </ItemGroup>
 

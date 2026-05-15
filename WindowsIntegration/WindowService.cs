@@ -148,7 +148,36 @@ public class WindowService
     
     }
 
-    private static WindowItem? CreateWindowItem(IntPtr hWnd)
+    public IReadOnlyList<WindowItem> EnumerateWindowsForDebug()
+    {
+        var allWindows = new List<WindowItem>();
+        var handle = GCHandle.Alloc(allWindows);
+
+        try
+        {
+            NativeMethods.EnumDesktopWindows(IntPtr.Zero, (IntPtr hWnd, ref GCHandle lParam) =>
+            {
+                if (!IsAltTabWindow(hWnd)) return true;
+
+                var item = CreateWindowItem(hWnd, processIcon: false);
+                if (item != null)
+                {
+                    allWindows.Add(item);
+                }
+
+                return true;
+            }, ref handle);
+        }
+        finally
+        {
+            if (handle.IsAllocated)
+                handle.Free();
+        }
+
+        return OrderWindowsByHistory(allWindows);
+    }
+
+    private static WindowItem? CreateWindowItem(IntPtr hWnd, bool processIcon = true)
     {
         string title = GetWindowTitle(hWnd);
         if (string.IsNullOrWhiteSpace(title)) return null;
@@ -165,7 +194,7 @@ public class WindowService
             wi.AppName = GetDisplayName(identifier);
 
             var iconCacheKey = CreateIconCacheKey(identifier);
-            if (_iconCache.TryGetValue(iconCacheKey, out var cachedIcon))
+            if (processIcon && _iconCache.TryGetValue(iconCacheKey, out var cachedIcon))
             {
                 wi.Icon = cachedIcon.Source;
                 wi.IconSize = cachedIcon.Size;
@@ -184,19 +213,34 @@ public class WindowService
 
                 if (newIcon != null)
                 {
-                    var processedIcon = IconAppearanceService.Apply(newIcon);
-                    wi.Icon = processedIcon.Source;
-                    wi.IconSize = processedIcon.Size;
-                    _iconCache[iconCacheKey] = processedIcon;
+                    if (processIcon)
+                    {
+                        var processedIcon = IconAppearanceService.Apply(newIcon);
+                        wi.Icon = processedIcon.Source;
+                        wi.IconSize = processedIcon.Size;
+                        _iconCache[iconCacheKey] = processedIcon;
+                    }
+                    else
+                    {
+                        wi.Icon = newIcon;
+                    }
                 }
             }
         }
 
         if (wi.Icon == null)
         {
-            var fallbackIcon = IconAppearanceService.Apply(GetSystemIcon(hWnd));
-            wi.Icon = fallbackIcon.Source;
-            wi.IconSize = fallbackIcon.Size;
+            var systemIcon = GetSystemIcon(hWnd);
+            if (processIcon)
+            {
+                var fallbackIcon = IconAppearanceService.Apply(systemIcon);
+                wi.Icon = fallbackIcon.Source;
+                wi.IconSize = fallbackIcon.Size;
+            }
+            else
+            {
+                wi.Icon = systemIcon;
+            }
         }
         return wi;
     }
@@ -424,6 +468,11 @@ public class WindowService
         var sb = new StringBuilder(len + 1);
         NativeMethods.GetWindowText(hWnd, sb, sb.Capacity);
         return sb.ToString();
+    }
+
+    internal static BitmapSource? GetIconFromPathForDebug(string path)
+    {
+        return GetIconFromPath(path);
     }
 
     private static ImageSource? GetIconFromAumid(string aumid, out string? title)

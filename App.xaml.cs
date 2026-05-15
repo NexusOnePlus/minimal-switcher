@@ -15,6 +15,15 @@ public partial class App : System.Windows.Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        if (HasArgument(e.Args, "--icon-debug"))
+        {
+            var window = new IconDebugWindow();
+            MainWindow = window;
+            window.Show();
+            base.OnStartup(e);
+            return;
+        }
+
         KeyboardHook.Start();
         CreateTrayIcon();
         base.OnStartup(e);
@@ -89,5 +98,18 @@ public partial class App : System.Windows.Application
         _trayIcon = null;
         _trayIconImage?.Dispose();
         _trayIconImage = null;
+    }
+
+    private static bool HasArgument(string[] args, string value)
+    {
+        foreach (var arg in args)
+        {
+            if (string.Equals(arg, value, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

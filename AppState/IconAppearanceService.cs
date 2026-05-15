@@ -9,7 +9,7 @@ public static class IconAppearanceService
 {
     private const int OutputSize = 128;
     private const double DefaultIconSize = 68;
-    private const double OrganicIconSize = 68;
+    private const double OrganicIconSize = 88;
     private const double RoundedSquareIconSize = 88;
     private const double FullBleedIconSize = 88;
 
@@ -38,7 +38,10 @@ public static class IconAppearanceService
             var analysis = Analyze(bitmap);
             var crop = CreateContentCrop(bitmap, analysis);
             var iconInset = GetRenderedInset(analysis, settings);
-            var destination = new Rect(iconInset, iconInset, OutputSize - iconInset * 2, OutputSize - iconInset * 2);
+            var destination = FitUniform(
+                crop.PixelWidth,
+                crop.PixelHeight,
+                new Rect(iconInset, iconInset, OutputSize - iconInset * 2, OutputSize - iconInset * 2));
 
             var visual = new DrawingVisual();
             using (var context = visual.RenderOpen())
@@ -47,7 +50,7 @@ public static class IconAppearanceService
                 {
                     var backing = new SolidColorBrush(analysis.BackingColor);
                     backing.Freeze();
-                    context.DrawRoundedRectangle(backing, null, new Rect(8, 8, 112, 112), 30, 30);
+                    context.DrawRoundedRectangle(backing, null, new Rect(4, 4, 120, 120), 28, 28);
                 }
 
                 context.DrawImage(crop, destination);
@@ -69,12 +72,37 @@ public static class IconAppearanceService
         }
     }
 
+    public static IconDebugInfo? AnalyzeForDebug(ImageSource? source)
+    {
+        if (source is not BitmapSource bitmapSource) return null;
+
+        var bitmap = EnsureBgra32(bitmapSource);
+        var analysis = Analyze(bitmap);
+        var processed = Apply(source);
+
+        return new IconDebugInfo(
+            bitmap,
+            CreateMaskBitmap(bitmap.PixelWidth, bitmap.PixelHeight, analysis),
+            CreateResidualBitmap(bitmap, analysis),
+            processed.Source,
+            analysis.IsFullBleed,
+            analysis.IsRoundedSquare,
+            analysis.NeedsBacking,
+            analysis.FillRatio,
+            analysis.CanvasRatio,
+            analysis.CornerOpacity,
+            analysis.EdgeOpacity,
+            analysis.RoundedFit.MissingInside,
+            analysis.RoundedFit.OutsideLeak,
+            processed.Size);
+    }
+
     private static double GetRenderedInset(IconAnalysis analysis, AppSettings settings)
     {
         if (settings.IconTreatmentMode != IconTreatmentMode.Unified) return 0;
         if (analysis.IsFullBleed) return 0;
         if (analysis.IsRoundedSquare) return 0;
-        if (analysis.NeedsBacking) return 16;
+        if (analysis.NeedsBacking) return 20;
         return 6;
     }
 
@@ -146,13 +174,16 @@ public static class IconAppearanceService
 
         if (opaque == 0)
         {
-            return new IconAnalysis(false, false, false, Color.FromRgb(28, 32, 40), new Int32Rect(0, 0, source.PixelWidth, source.PixelHeight));
+            var emptyBounds = new Int32Rect(0, 0, source.PixelWidth, source.PixelHeight);
+            return new IconAnalysis(false, false, false, Color.FromRgb(28, 32, 40), emptyBounds, new ShapeFit(1, 1, 1, 0), 0, 0, 0, 0);
         }
 
         var boundsWidth = maxX - minX + 1;
         var boundsHeight = maxY - minY + 1;
         var fillRatio = opaque / (double)(boundsWidth * boundsHeight);
         var canvasRatio = Math.Max(boundsWidth / (double)source.PixelWidth, boundsHeight / (double)source.PixelHeight);
+        var aspectRatio = boundsWidth / (double)boundsHeight;
+        var squareAspect = aspectRatio is >= 0.86 and <= 1.14;
         var cornerOpacity = GetCornerOpacityRatio(pixels, stride, source.PixelWidth, source.PixelHeight);
         var edgeOpacity = GetEdgeOpacityRatio(pixels, stride, source.PixelWidth, source.PixelHeight);
         var roundedFit = GetRoundedSquareFit(pixels, stride, minX, minY, boundsWidth, boundsHeight);
@@ -161,15 +192,23 @@ public static class IconAppearanceService
             && fillRatio >= 0.68
             && fillRatio <= 0.84
             && edgeOpacity >= 0.56;
-        var fullBleed = canvasRatio >= 0.9 && fillRatio >= 0.84 && !transparentCorners;
+        var fullBleed = canvasRatio >= 0.9
+            && fillRatio >= 0.84
+            && roundedFit.MissingInside <= 0.03
+            && roundedFit.OutsideLeak <= 0.04
+            && squareAspect
+            && !transparentCorners;
         var roundedSquare = canvasRatio >= 0.78
             && fillRatio >= 0.58
             && edgeOpacity >= 0.48
-            && roundedFit.MissingInside <= 0.07
+            && roundedFit.MissingInside <= 0.035
             && roundedFit.OutsideLeak <= 0.04
+            && squareAspect
             && !circleLike;
         var organicShape = circleLike || (transparentCorners && fillRatio < 0.84);
-        var needsBacking = organicShape || (!fullBleed && !roundedSquare && (fillRatio < 0.82 || canvasRatio < 0.84));
+        var needsBacking = organicShape
+            || !squareAspect
+            || (!fullBleed && !roundedSquare && (fillRatio < 0.82 || canvasRatio < 0.84));
 
         var dominant = Color.FromRgb((byte)(red / opaque), (byte)(green / opaque), (byte)(blue / opaque));
         var padding = needsBacking ? 2 : 0;
@@ -179,12 +218,22 @@ public static class IconAppearanceService
             Math.Min(source.PixelWidth - Math.Max(0, minX - padding), boundsWidth + padding * 2),
             Math.Min(source.PixelHeight - Math.Max(0, minY - padding), boundsHeight + padding * 2));
 
-        return new IconAnalysis(fullBleed, roundedSquare, needsBacking, CreateBackingColor(dominant), crop);
+        return new IconAnalysis(
+            fullBleed,
+            roundedSquare,
+            needsBacking,
+            CreateBackingColor(dominant),
+            crop,
+            roundedFit,
+            fillRatio,
+            canvasRatio,
+            cornerOpacity,
+            edgeOpacity);
     }
 
     private static ShapeFit GetRoundedSquareFit(byte[] pixels, int stride, int startX, int startY, int width, int height)
     {
-        var best = new ShapeFit(1, 1);
+        var best = new ShapeFit(1, 1, 1, 0);
         var scales = new[] { 1.0, 0.96, 0.92 };
         var radiusFactors = new[] { 0.06, 0.16, 0.26 };
 
@@ -201,6 +250,23 @@ public static class IconAppearanceService
         }
 
         return best;
+    }
+
+    private static Rect FitUniform(double sourceWidth, double sourceHeight, Rect bounds)
+    {
+        if (sourceWidth <= 0 || sourceHeight <= 0 || bounds.Width <= 0 || bounds.Height <= 0)
+        {
+            return bounds;
+        }
+
+        var scale = Math.Min(bounds.Width / sourceWidth, bounds.Height / sourceHeight);
+        var width = sourceWidth * scale;
+        var height = sourceHeight * scale;
+        return new Rect(
+            bounds.X + (bounds.Width - width) * 0.5,
+            bounds.Y + (bounds.Height - height) * 0.5,
+            width,
+            height);
     }
 
     private static ShapeFit GetMaskFit(
@@ -250,12 +316,14 @@ public static class IconAppearanceService
 
         if (maskPixels == 0 || visibleTotal == 0)
         {
-            return new ShapeFit(1, 1);
+            return new ShapeFit(1, 1, scale, radiusFactor);
         }
 
         return new ShapeFit(
             missingInside / (double)maskPixels,
-            visibleOutside / (double)visibleTotal);
+            visibleOutside / (double)visibleTotal,
+            scale,
+            radiusFactor);
     }
 
     private static bool IsInsideRoundedRect(double x, double y, double width, double height, double radius)
@@ -275,6 +343,103 @@ public static class IconAppearanceService
         var dx = x - centerX;
         var dy = y - centerY;
         return dx * dx + dy * dy <= radius * radius;
+    }
+
+    private static BitmapSource CreateMaskBitmap(int width, int height, IconAnalysis analysis)
+    {
+        var stride = width * 4;
+        var pixels = new byte[stride * height];
+        var bounds = analysis.ContentBounds;
+        var maskWidth = bounds.Width * analysis.RoundedFit.Scale;
+        var maskHeight = bounds.Height * analysis.RoundedFit.Scale;
+        var offsetX = (bounds.Width - maskWidth) * 0.5;
+        var offsetY = (bounds.Height - maskHeight) * 0.5;
+        var radius = Math.Max(2.0, Math.Min(maskWidth, maskHeight) * analysis.RoundedFit.RadiusFactor);
+
+        for (var y = bounds.Y; y < bounds.Y + bounds.Height; y++)
+        {
+            for (var x = bounds.X; x < bounds.X + bounds.Width; x++)
+            {
+                var inMask = IsInsideRoundedRect(
+                    x - bounds.X + 0.5 - offsetX,
+                    y - bounds.Y + 0.5 - offsetY,
+                    maskWidth,
+                    maskHeight,
+                    radius);
+                if (!inMask) continue;
+
+                var index = y * stride + x * 4;
+                pixels[index] = 255;
+                pixels[index + 1] = 255;
+                pixels[index + 2] = 255;
+                pixels[index + 3] = 150;
+            }
+        }
+
+        return CreateFrozenBitmap(width, height, pixels, stride);
+    }
+
+    private static BitmapSource CreateResidualBitmap(BitmapSource source, IconAnalysis analysis)
+    {
+        var width = source.PixelWidth;
+        var height = source.PixelHeight;
+        var stride = width * 4;
+        var sourcePixels = new byte[stride * height];
+        var pixels = new byte[stride * height];
+        source.CopyPixels(sourcePixels, stride, 0);
+
+        var bounds = analysis.ContentBounds;
+        var maskWidth = bounds.Width * analysis.RoundedFit.Scale;
+        var maskHeight = bounds.Height * analysis.RoundedFit.Scale;
+        var offsetX = (bounds.Width - maskWidth) * 0.5;
+        var offsetY = (bounds.Height - maskHeight) * 0.5;
+        var radius = Math.Max(2.0, Math.Min(maskWidth, maskHeight) * analysis.RoundedFit.RadiusFactor);
+
+        for (var y = bounds.Y; y < bounds.Y + bounds.Height; y++)
+        {
+            for (var x = bounds.X; x < bounds.X + bounds.Width; x++)
+            {
+                var inMask = IsInsideRoundedRect(
+                    x - bounds.X + 0.5 - offsetX,
+                    y - bounds.Y + 0.5 - offsetY,
+                    maskWidth,
+                    maskHeight,
+                    radius);
+                var index = y * stride + x * 4;
+                var isVisible = sourcePixels[index + 3] >= 24;
+
+                if (inMask && !isVisible)
+                {
+                    pixels[index] = 64;
+                    pixels[index + 1] = 64;
+                    pixels[index + 2] = 255;
+                    pixels[index + 3] = 210;
+                }
+                else if (!inMask && isVisible)
+                {
+                    pixels[index] = 255;
+                    pixels[index + 1] = 170;
+                    pixels[index + 2] = 0;
+                    pixels[index + 3] = 230;
+                }
+                else if (isVisible)
+                {
+                    pixels[index] = sourcePixels[index];
+                    pixels[index + 1] = sourcePixels[index + 1];
+                    pixels[index + 2] = sourcePixels[index + 2];
+                    pixels[index + 3] = 120;
+                }
+            }
+        }
+
+        return CreateFrozenBitmap(width, height, pixels, stride);
+    }
+
+    private static BitmapSource CreateFrozenBitmap(int width, int height, byte[] pixels, int stride)
+    {
+        var bitmap = BitmapSource.Create(width, height, 96, 96, PixelFormats.Pbgra32, null, pixels, stride);
+        bitmap.Freeze();
+        return bitmap;
     }
 
     private static double GetCornerOpacityRatio(byte[] pixels, int stride, int width, int height)
@@ -463,11 +628,37 @@ public static class IconAppearanceService
     }
 
     private sealed record HslColor(double Hue, double Saturation, double Lightness);
-    private sealed record ShapeFit(double MissingInside, double OutsideLeak)
+    private sealed record ShapeFit(double MissingInside, double OutsideLeak, double Scale, double RadiusFactor)
     {
         public double TotalError => MissingInside + OutsideLeak * 1.8;
     }
-    private sealed record IconAnalysis(bool IsFullBleed, bool IsRoundedSquare, bool NeedsBacking, Color BackingColor, Int32Rect ContentBounds);
+    private sealed record IconAnalysis(
+        bool IsFullBleed,
+        bool IsRoundedSquare,
+        bool NeedsBacking,
+        Color BackingColor,
+        Int32Rect ContentBounds,
+        ShapeFit RoundedFit,
+        double FillRatio,
+        double CanvasRatio,
+        double CornerOpacity,
+        double EdgeOpacity);
 }
 
 public sealed record IconAppearance(ImageSource? Source, double Size);
+
+public sealed record IconDebugInfo(
+    ImageSource Normalized,
+    ImageSource Mask,
+    ImageSource Residual,
+    ImageSource? Processed,
+    bool IsFullBleed,
+    bool IsRoundedSquare,
+    bool NeedsBacking,
+    double FillRatio,
+    double CanvasRatio,
+    double CornerOpacity,
+    double EdgeOpacity,
+    double MissingInside,
+    double OutsideLeak,
+    double IconSize);
