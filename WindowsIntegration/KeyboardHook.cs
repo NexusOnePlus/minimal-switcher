@@ -30,8 +30,8 @@ class KeyboardHook
     public static void Start()
     {
         if (_hookID != IntPtr.Zero) return;
+        RegistryHelper.EnsureSystemAltTabRestored();
         _hookID = SetHook(_proc);
-        RegistryHelper.DisableSystemAltTab();
     }
 
     public static void Stop()

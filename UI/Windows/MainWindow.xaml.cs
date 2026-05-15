@@ -336,6 +336,7 @@ public partial class MainWindow : Window
                 _currentIndex = _items.Count > 1 ? 1 : 0;
                 if (_useShaderTheme) CaptureBehindWindow();
                 Show();
+                Activate();
                 StartRecaptureTimer();
         }
         else
@@ -374,11 +375,15 @@ public partial class MainWindow : Window
             SetWindowDisplayAffinity(hwnd, WDA_NONE);
         }
 
-        // Authorize the process to take focus while we are still active
+        NativeMethods.GetWindowThreadProcessId(selected.Hwnd, out var windowProcessId);
         NativeMethods.AllowSetForegroundWindow(selected.ProcessId);
+        if (windowProcessId != 0 && windowProcessId != selected.ProcessId)
+        {
+            NativeMethods.AllowSetForegroundWindow(windowProcessId);
+        }
 
         Hide();
-        System.Threading.Thread.Sleep(50);
+        System.Threading.Thread.Sleep(90);
         ForceForegroundWindow(selected.Hwnd);
         _items.Clear();
     }
@@ -406,7 +411,7 @@ public partial class MainWindow : Window
         if (_activeFilter == SwitcherFilter.AllWindows && AppSettingsService.Instance.Current.CombineAppInstances)
         {
             windows = windows
-                .GroupBy(w => w.Identifier)
+                .GroupBy(CreateGroupKey)
                 .Select(g => g.First())
                 .ToList();
         }
@@ -449,6 +454,28 @@ public partial class MainWindow : Window
         return windows.Where(w => w.ProcessId == sourcePid).ToList();
     }
 
+    private static string CreateGroupKey(WindowItem window)
+    {
+        if (!string.IsNullOrWhiteSpace(window.Identifier))
+        {
+            return $"id:{window.Identifier.ToUpperInvariant()}";
+        }
+
+        if (!string.IsNullOrWhiteSpace(window.AppName))
+        {
+            return $"app:{window.AppName.ToUpperInvariant()}";
+        }
+
+        var title = window.Title;
+        var separator = title.IndexOf(" - ", StringComparison.Ordinal);
+        if (separator > 0)
+        {
+            title = title[(separator + 3)..];
+        }
+
+        return $"title:{title.Trim().ToUpperInvariant()}";
+    }
+
     private void UpdateSelection()
     {
         for (int i = 0; i < _items.Count; i++)
@@ -464,20 +491,56 @@ public partial class MainWindow : Window
         var targetThreadId = GetWindowThreadProcessId(hwnd, out _);
         var foregroundThreadId = GetWindowThreadProcessId(foregroundHwnd, out _);
 
-        if (currentThreadId != targetThreadId)
-            AttachThreadInput(currentThreadId, targetThreadId, true);
-        if (foregroundThreadId != targetThreadId && foregroundThreadId != currentThreadId)
+        if (NativeMethods.IsIconic(hwnd))
         {
-            AttachThreadInput(currentThreadId, foregroundThreadId, false);
-            AttachThreadInput(currentThreadId, foregroundThreadId, true);
+            NativeMethods.ShowWindow(hwnd, NativeMethods.SW_RESTORE);
+        }
+        else
+        {
+            NativeMethods.ShowWindow(hwnd, NativeMethods.SW_SHOW);
         }
 
-        SetForegroundWindow(hwnd);
+        NativeMethods.SetWindowPos(
+            hwnd,
+            NativeMethods.HWND_TOP,
+            0,
+            0,
+            0,
+            0,
+            NativeMethods.SWP_NOMOVE | NativeMethods.SWP_NOSIZE | NativeMethods.SWP_SHOWWINDOW);
 
-        if (foregroundThreadId != targetThreadId && foregroundThreadId != currentThreadId)
-            AttachThreadInput(currentThreadId, foregroundThreadId, false);
-        if (currentThreadId != targetThreadId)
-            AttachThreadInput(currentThreadId, targetThreadId, false);
+        var attachedTarget = false;
+        var attachedForeground = false;
+        try
+        {
+            if (currentThreadId != targetThreadId && targetThreadId != 0)
+            {
+                attachedTarget = AttachThreadInput(currentThreadId, targetThreadId, true);
+            }
+
+            if (foregroundThreadId != targetThreadId && foregroundThreadId != currentThreadId && foregroundThreadId != 0)
+            {
+                attachedForeground = AttachThreadInput(currentThreadId, foregroundThreadId, true);
+            }
+
+            NativeMethods.BringWindowToTop(hwnd);
+            SetForegroundWindow(hwnd);
+            NativeMethods.SetFocus(hwnd);
+            NativeMethods.SwitchToThisWindow(hwnd, true);
+            SetForegroundWindow(hwnd);
+        }
+        finally
+        {
+            if (attachedForeground)
+            {
+                AttachThreadInput(currentThreadId, foregroundThreadId, false);
+            }
+
+            if (attachedTarget)
+            {
+                AttachThreadInput(currentThreadId, targetThreadId, false);
+            }
+        }
     }
 
     private void IconBorder_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)

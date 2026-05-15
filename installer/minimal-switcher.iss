@@ -1,6 +1,7 @@
 #define MyAppName "Minimal Switcher"
 #define MyAppPublisher "wv357"
 #define MyAppExeName "minimal-switcher.exe"
+#define MyTaskName "MinimalSwitcher"
 #define MyAppId "{{7F96AF29-1F66-4B6B-A9A8-5C82C7B445E8}"
 #define MyAppVersion GetEnv("APP_VERSION")
 #if MyAppVersion == ""
@@ -26,8 +27,7 @@ AppUpdatesURL=https://github.com/wv357/minimal-switcher/releases
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
-PrivilegesRequired=lowest
-PrivilegesRequiredOverridesAllowed=dialog
+PrivilegesRequired=admin
 OutputDir={#OutputDir}
 OutputBaseFilename=MinimalSwitcherSetup-{#MyAppVersion}
 SetupIconFile=..\Assets\AppIcon.ico
@@ -51,7 +51,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "Accesos directos:"; Flags: unchecked
-Name: "startup"; Description: "Iniciar Minimal Switcher con Windows"; GroupDescription: "Inicio:"; Flags: unchecked
+Name: "startup"; Description: "Iniciar Minimal Switcher con Windows con privilegios elevados"; GroupDescription: "Inicio:"; Flags: unchecked
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -61,12 +61,14 @@ Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
 Name: "{group}\Desinstalar {#MyAppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
-[Registry]
-Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "{#MyAppName}"; ValueData: """{app}\{#MyAppExeName}"""; Tasks: startup
-Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueName: "{#MyAppName}"; Flags: deletevalue; Tasks: not startup
-
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "Iniciar {#MyAppName}"; Flags: nowait postinstall skipifsilent
+Filename: "{sys}\schtasks.exe"; Parameters: "/Create /TN ""{#MyTaskName}"" /TR ""\""{app}\{#MyAppExeName}\"""" /SC ONLOGON /RL HIGHEST /F"; Flags: runhidden; Tasks: startup
+Filename: "{sys}\schtasks.exe"; Parameters: "/Delete /TN ""{#MyTaskName}"" /F"; Flags: runhidden; Tasks: not startup
+Filename: "{sys}\schtasks.exe"; Parameters: "/Run /TN ""{#MyTaskName}"""; Description: "Iniciar {#MyAppName}"; Flags: nowait postinstall skipifsilent runhidden; Tasks: startup
+Filename: "{app}\{#MyAppExeName}"; Description: "Iniciar {#MyAppName}"; Flags: nowait postinstall skipifsilent; Tasks: not startup
+
+[UninstallRun]
+Filename: "{sys}\schtasks.exe"; Parameters: "/Delete /TN ""{#MyTaskName}"" /F"; Flags: runhidden
 
 [Code]
 function InitializeSetup(): Boolean;

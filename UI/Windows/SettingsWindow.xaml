@@ -885,7 +885,7 @@
                                     Padding="16">
                                 <StackPanel>
                                     <CheckBox x:Name="SameProcessShortcutCheckBox"
-                                              Content="Alt + ` alterna ventanas de la misma app"
+                                              Content="Alt + | alterna ventanas de la misma app"
                                               Style="{StaticResource SwitchCheckBox}"
                                               Checked="SameProcessShortcutCheckBox_Changed"
                                               Unchecked="SameProcessShortcutCheckBox_Changed" />
@@ -895,7 +895,7 @@
                                               Margin="0,12,0,0"
                                               Checked="CombineAppInstancesCheckBox_Changed"
                                               Unchecked="CombineAppInstancesCheckBox_Changed" />
-                                    <TextBlock Text="El switcher filtra por la app activa y mantiene Alt + Tab como cambio global."
+                                    <TextBlock Text="El switcher filtra por la app activa. Alt + Tab mantiene el cambio global."
                                                Foreground="{StaticResource TextMuted}"
                                                TextWrapping="Wrap"
                                                FontSize="12"
