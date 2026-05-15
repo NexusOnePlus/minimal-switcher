@@ -1,7 +1,6 @@
 ﻿using minimal_switcher.Shaders;
 using System;
 using System.Collections.ObjectModel;
-using System.ComponentModel;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -517,25 +516,4 @@ public partial class MainWindow : Window
         public IntPtr BlurRegion;
         public bool TransitionOnMaximized;
     }
-}
-
-public class SwitcherItem : INotifyPropertyChanged
-{
-    private bool _isSelected;
-
-    public IntPtr Hwnd { get; set; }
-    public string Title { get; set; } = string.Empty;
-    public System.Windows.Media.ImageSource? Icon { get; set; }
-
-    public bool IsSelected
-    {
-        get => _isSelected;
-        set
-        {
-            _isSelected = value;
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected)));
-        }
-    }
-
-    public event PropertyChangedEventHandler? PropertyChanged;
 }

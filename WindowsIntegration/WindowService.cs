@@ -28,7 +28,7 @@ public class WindowService
     }
 
     private static readonly List<IntPtr> _windowHistory = new List<IntPtr>();
-    private static readonly HashSet<IntPtr> _ignoredWindows = new();
+    private static readonly IgnoredWindowRegistry IgnoredWindows = IgnoredWindowRegistry.Instance;
     private static readonly NativeMethods.WinEventDelegate _winEventProc = new NativeMethods.WinEventDelegate(WinEventProc);
     private static readonly Dictionary<string, ImageSource> _iconCache = new();
     private static readonly Dictionary<IntPtr, (AppType Type, string Identifier)> _identifierCache = new();
@@ -44,7 +44,7 @@ public class WindowService
     {
         int originalCount = _windowHistory.Count;
         _windowHistory.RemoveAll(hwnd => !NativeMethods.IsWindow(hwnd));
-        _ignoredWindows.RemoveWhere(hwnd => !NativeMethods.IsWindow(hwnd));
+        IgnoredWindows.RemoveInvalidWindows();
         Debug.WriteLine($"[HISTORY] Cleanup completed. Removed {originalCount - _windowHistory.Count} invalid windows.");
     }
 
@@ -60,7 +60,7 @@ public class WindowService
             var item = CreateWindowItem(hwnd);
             if (item != null)
             {
-                item.IsIgnored = _ignoredWindows.Contains(hwnd);
+                item.IsIgnored = IgnoredWindows.Contains(hwnd);
                 recent.Add(item);
             }
         }
@@ -73,7 +73,7 @@ public class WindowService
         CleanupHistory();
 
         var ignored = new List<WindowItem>();
-        foreach (var hwnd in _ignoredWindows)
+        foreach (var hwnd in IgnoredWindows.GetAll())
         {
             var item = CreateWindowItem(hwnd);
             if (item != null)
@@ -88,15 +88,12 @@ public class WindowService
 
     public static void IgnoreWindow(IntPtr hwnd)
     {
-        if (hwnd != IntPtr.Zero && NativeMethods.IsWindow(hwnd))
-        {
-            _ignoredWindows.Add(hwnd);
-        }
+        IgnoredWindows.Ignore(hwnd);
     }
 
     public static void RestoreWindow(IntPtr hwnd)
     {
-        _ignoredWindows.Remove(hwnd);
+        IgnoredWindows.Restore(hwnd);
     }
 
     private static void UpdateWindowHistory(IntPtr hwnd)
@@ -130,7 +127,7 @@ public class WindowService
             NativeMethods.EnumDesktopWindows(IntPtr.Zero, (IntPtr hWnd, ref GCHandle lParam) =>
             {
                 if (!IsAltTabWindow(hWnd)) return true;
-                if (_ignoredWindows.Contains(hWnd)) return true;
+                if (IgnoredWindows.Contains(hWnd)) return true;
                 
                 var wi = CreateWindowItem(hWnd);
                 if (wi != null && wi.Icon != null)
@@ -517,17 +514,4 @@ public class WindowService
         }
         return null;
     }
-}
-
-public enum AppType { Path, Aumid }
-
-public class WindowItem
-{
-    public IntPtr Hwnd { get; set; }
-    public string Title { get; set; } = string.Empty;
-    public string Identifier { get; set; } = string.Empty;
-    public string AppName { get; set; } = string.Empty;
-    public uint ProcessId { get; set; }
-    public bool IsIgnored { get; set; }
-    public ImageSource? Icon { get; set; }
 }
