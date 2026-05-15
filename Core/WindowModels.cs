@@ -23,6 +23,7 @@ public class WindowItem
     public string Identifier { get; set; } = string.Empty;
     public string AppName { get; set; } = string.Empty;
     public uint ProcessId { get; set; }
+    public uint RealProcessId { get; set; }
     public bool IsIgnored { get; set; }
     public ImageSource? Icon { get; set; }
     public double IconSize { get; set; } = 64;
@@ -33,6 +34,8 @@ public class SwitcherItem : INotifyPropertyChanged
     private bool _isSelected;
 
     public IntPtr Hwnd { get; set; }
+    public uint ProcessId { get; set; }
+    public uint RealProcessId { get; set; }
     public string Title { get; set; } = string.Empty;
     public ImageSource? Icon { get; set; }
     public double IconSize { get; set; } = 64;

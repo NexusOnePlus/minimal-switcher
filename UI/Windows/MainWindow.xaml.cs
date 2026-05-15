@@ -358,7 +358,7 @@ public partial class MainWindow : Window
         }
 
         var selected = _items[_currentIndex];
-        Log($"Selected: '{selected.Title}' Hwnd={selected.Hwnd}");
+        Log($"Selected: '{selected.Title}' Hwnd={selected.Hwnd} PID={selected.ProcessId} RealPID={selected.RealProcessId}");
 
         var placement = new NativeMethods.WINDOWPLACEMENT { length = Marshal.SizeOf<NativeMethods.WINDOWPLACEMENT>() };
         NativeMethods.GetWindowPlacement(selected.Hwnd, ref placement);
@@ -374,9 +374,20 @@ public partial class MainWindow : Window
             SetWindowDisplayAffinity(hwnd, WDA_NONE);
         }
 
-        Hide();
-        System.Threading.Thread.Sleep(50);
+        // Authorize both the Frame and the Real App to take focus while we are still the foreground window
+        NativeMethods.AllowSetForegroundWindow(selected.ProcessId);
+        if (selected.RealProcessId != 0 && selected.RealProcessId != selected.ProcessId)
+        {
+            NativeMethods.AllowSetForegroundWindow(selected.RealProcessId);
+        }
+
+        // Perform focus switch BEFORE hiding, matching the working Click logic
         ForceForegroundWindow(selected.Hwnd);
+        
+        // Fallback for UWP apps
+        NativeMethods.SwitchToThisWindow(selected.Hwnd, true);
+
+        Hide();
         _items.Clear();
     }
 
@@ -399,11 +410,22 @@ public partial class MainWindow : Window
         _items.Clear();
         var windows = _windowService.EnumerateWindowsWithIcons();
         windows = FilterWindows(windows);
+
+        if (_activeFilter == SwitcherFilter.AllWindows && AppSettingsService.Instance.Current.CombineAppInstances)
+        {
+            windows = windows
+                .GroupBy(w => w.Identifier)
+                .Select(g => g.First())
+                .ToList();
+        }
+
         foreach (var w in windows)
         {
             _items.Add(new SwitcherItem
             {
                 Hwnd = w.Hwnd,
+                ProcessId = w.ProcessId,
+                RealProcessId = w.RealProcessId,
                 Title = w.Title,
                 Icon = w.Icon,
                 IconSize = w.IconSize,

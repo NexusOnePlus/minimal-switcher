@@ -889,6 +889,12 @@
                                               Style="{StaticResource SwitchCheckBox}"
                                               Checked="SameProcessShortcutCheckBox_Changed"
                                               Unchecked="SameProcessShortcutCheckBox_Changed" />
+                                    <CheckBox x:Name="CombineAppInstancesCheckBox"
+                                              Content="Agrupar ventanas de la misma aplicación"
+                                              Style="{StaticResource SwitchCheckBox}"
+                                              Margin="0,12,0,0"
+                                              Checked="CombineAppInstancesCheckBox_Changed"
+                                              Unchecked="CombineAppInstancesCheckBox_Changed" />
                                     <TextBlock Text="El switcher filtra por la app activa y mantiene Alt + Tab como cambio global."
                                                Foreground="{StaticResource TextMuted}"
                                                TextWrapping="Wrap"

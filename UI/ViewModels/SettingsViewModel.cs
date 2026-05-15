@@ -99,12 +99,18 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
             IconTreatmentMode = current.IconTreatmentMode,
             IconTintColor = current.IconTintColor,
             IconTintStrength = current.IconTintStrength,
-            EnableSameProcessShortcut = current.EnableSameProcessShortcut
+            EnableSameProcessShortcut = current.EnableSameProcessShortcut,
+            CombineAppInstances = current.CombineAppInstances
         };
 
         update(next);
         _settingsService.Update(next);
         OnPropertyChanged(nameof(Current));
+    }
+
+    public void SetCombineAppInstances(bool enabled)
+    {
+        UpdateSettings(settings => settings.CombineAppInstances = enabled);
     }
 
     public void SetIconTreatment(bool enabled)

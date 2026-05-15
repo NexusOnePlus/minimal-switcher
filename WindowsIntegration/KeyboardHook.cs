@@ -17,7 +17,8 @@ class KeyboardHook
     private const int VK_LMENU = 0xA4;
     private const int VK_RMENU = 0xA5;
     private const int VK_TAB = 0x09;
-    private const int VK_OEM_3 = 0xC0;
+    private const int VK_OEM_3 = 0xC0; // US: `
+    private const int VK_OEM_5 = 0xDC; // Spanish: º/ª \
 
     private static LowLevelKeyboardProc _proc = HookCallback;
     private static IntPtr _hookID = IntPtr.Zero;
@@ -30,6 +31,7 @@ class KeyboardHook
     {
         if (_hookID != IntPtr.Zero) return;
         _hookID = SetHook(_proc);
+        RegistryHelper.DisableSystemAltTab();
     }
 
     public static void Stop()
@@ -85,7 +87,7 @@ class KeyboardHook
                 }
 
                 var isAltTab = vkCode == VK_TAB;
-                var isSameProcessShortcut = vkCode == VK_OEM_3
+                var isSameProcessShortcut = (vkCode == VK_OEM_3 || vkCode == VK_OEM_5)
                     && AppSettingsService.Instance.Current.EnableSameProcessShortcut;
 
                 if (_isAltDown && (isAltTab || isSameProcessShortcut) && !isKeyRepeat && !_isCustomAltTabActive)
@@ -104,7 +106,7 @@ class KeyboardHook
                     return (IntPtr)1;
                 }
 
-                if (_isCustomAltTabActive && (vkCode == VK_TAB || vkCode == VK_OEM_3))
+                if (_isCustomAltTabActive && (vkCode == VK_TAB || vkCode == VK_OEM_3 || vkCode == VK_OEM_5))
                 {
                     Debug.WriteLine("[HOOK] Custom Alt+Tab NEXT");
                     Application.Current?.Dispatcher.Invoke(Switcher.Next);

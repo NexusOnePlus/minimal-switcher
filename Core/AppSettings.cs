@@ -23,6 +23,7 @@ public sealed class AppSettings
     public string IconTintColor { get; set; } = "#F5F6F8";
     public int IconTintStrength { get; set; } = 0;
     public bool EnableSameProcessShortcut { get; set; } = true;
+    public bool CombineAppInstances { get; set; } = true;
 }
 
 public sealed record ThemePreset(

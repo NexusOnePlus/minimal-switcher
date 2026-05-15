@@ -121,7 +121,8 @@ public sealed class AppSettingsService
                 ? settings.IconTintColor.ToUpperInvariant()
                 : "#F5F6F8",
             IconTintStrength = Math.Clamp(settings.IconTintStrength, 0, 100),
-            EnableSameProcessShortcut = settings.EnableSameProcessShortcut
+            EnableSameProcessShortcut = settings.EnableSameProcessShortcut,
+            CombineAppInstances = settings.CombineAppInstances
         };
     }
 

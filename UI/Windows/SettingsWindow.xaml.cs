@@ -41,9 +41,17 @@ public partial class SettingsWindow : Window
         IconTintSlider.Value = settings.IconTintStrength;
         IconTintValueText.Text = $"{settings.IconTintStrength}%";
         SameProcessShortcutCheckBox.IsChecked = settings.EnableSameProcessShortcut;
+        CombineAppInstancesCheckBox.IsChecked = settings.CombineAppInstances;
         UpdatePreview(settings);
 
         _isLoading = false;
+    }
+
+    private void CombineAppInstancesCheckBox_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_isLoading) return;
+
+        _viewModel.SetCombineAppInstances(CombineAppInstancesCheckBox.IsChecked == true);
     }
 
     private void UpdatePreview(AppSettings settings)
