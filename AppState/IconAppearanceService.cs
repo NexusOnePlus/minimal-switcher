@@ -8,9 +8,9 @@ namespace minimal_switcher;
 public static class IconAppearanceService
 {
     private const int OutputSize = 128;
-    private const double DefaultIconSize = 64;
-    private const double OrganicIconSize = 64;
-    private const double RoundedSquareIconSize = 86;
+    private const double DefaultIconSize = 68;
+    private const double OrganicIconSize = 68;
+    private const double RoundedSquareIconSize = 88;
     private const double FullBleedIconSize = 88;
 
     public static string SettingsKey
@@ -167,6 +167,7 @@ public static class IconAppearanceService
             && edgeOpacity >= 0.5
             && roundedFit.Coverage >= 0.84
             && roundedFit.Leak <= 0.08
+            && roundedFit.BandCoverage >= 0.68
             && !circleLike;
         var organicShape = circleLike || (transparentCorners && fillRatio < 0.84);
         var needsBacking = organicShape || (!fullBleed && !roundedSquare && (fillRatio < 0.82 || canvasRatio < 0.84));
@@ -206,12 +207,46 @@ public static class IconAppearanceService
 
         if (maskPixels == 0 || visibleTotal == 0)
         {
-            return new ShapeFit(0, 1);
+            return new ShapeFit(0, 1, 0);
         }
 
         return new ShapeFit(
             visibleInside / (double)maskPixels,
-            visibleOutside / (double)visibleTotal);
+            visibleOutside / (double)visibleTotal,
+            GetBandCoverage(pixels, stride, startX, startY, width, height));
+    }
+
+    private static double GetBandCoverage(byte[] pixels, int stride, int startX, int startY, int width, int height)
+    {
+        var rows = new[] { 0.22, 0.35, 0.5, 0.65, 0.78 };
+        var columns = new[] { 0.22, 0.35, 0.5, 0.65, 0.78 };
+        var minCoverage = 1.0;
+
+        foreach (var row in rows)
+        {
+            var y = startY + Math.Clamp((int)Math.Round((height - 1) * row), 0, height - 1);
+            var visible = 0;
+            for (var x = startX; x < startX + width; x++)
+            {
+                if (pixels[y * stride + x * 4 + 3] >= 24) visible++;
+            }
+
+            minCoverage = Math.Min(minCoverage, visible / (double)width);
+        }
+
+        foreach (var column in columns)
+        {
+            var x = startX + Math.Clamp((int)Math.Round((width - 1) * column), 0, width - 1);
+            var visible = 0;
+            for (var y = startY; y < startY + height; y++)
+            {
+                if (pixels[y * stride + x * 4 + 3] >= 24) visible++;
+            }
+
+            minCoverage = Math.Min(minCoverage, visible / (double)height);
+        }
+
+        return minCoverage;
     }
 
     private static bool IsInsideRoundedRect(double x, double y, double width, double height, double radius)
@@ -419,7 +454,7 @@ public static class IconAppearanceService
     }
 
     private sealed record HslColor(double Hue, double Saturation, double Lightness);
-    private sealed record ShapeFit(double Coverage, double Leak);
+    private sealed record ShapeFit(double Coverage, double Leak, double BandCoverage);
     private sealed record IconAnalysis(bool IsFullBleed, bool IsRoundedSquare, bool NeedsBacking, Color BackingColor, Int32Rect ContentBounds);
 }
 
