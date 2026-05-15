@@ -160,6 +160,52 @@
             </Setter>
         </Style>
 
+        <Style x:Key="SwitchCheckBox" TargetType="CheckBox">
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="48" />
+                            </Grid.ColumnDefinitions>
+                            <ContentPresenter VerticalAlignment="Center" />
+                            <Border x:Name="Track"
+                                    Grid.Column="1"
+                                    Width="48"
+                                    Height="28"
+                                    CornerRadius="14"
+                                    Background="#1B2028"
+                                    BorderBrush="{StaticResource BorderSoft}"
+                                    BorderThickness="1">
+                                <Ellipse x:Name="Thumb"
+                                         Width="20"
+                                         Height="20"
+                                         Fill="#D9DEE7"
+                                         HorizontalAlignment="Left"
+                                         Margin="4,0,0,0" />
+                            </Border>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Track" Property="BorderBrush" Value="{StaticResource BorderStrong}" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Track" Property="Background" Value="#EEF1F6" />
+                                <Setter TargetName="Track" Property="BorderBrush" Value="#EEF1F6" />
+                                <Setter TargetName="Thumb" Property="Fill" Value="#0B0D10" />
+                                <Setter TargetName="Thumb" Property="HorizontalAlignment" Value="Right" />
+                                <Setter TargetName="Thumb" Property="Margin" Value="0,0,4,0" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="PresetTileButton" TargetType="Button">
             <Setter Property="Height" Value="92" />
             <Setter Property="Margin" Value="0,0,10,10" />
@@ -591,6 +637,58 @@
                                             BorderThickness="1"
                                             HorizontalAlignment="Stretch">
                                         <TextBlock x:Name="OpacityValueText"
+                                                   Foreground="{StaticResource TextPrimary}"
+                                                   FontWeight="SemiBold"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center" />
+                                    </Border>
+
+                                    <Border Height="1"
+                                            Margin="0,18,0,16"
+                                            Background="{StaticResource BorderSoft}" />
+
+                                    <TextBlock Text="Iconos"
+                                               Foreground="{StaticResource TextPrimary}"
+                                               FontSize="15"
+                                               FontWeight="SemiBold" />
+                                    <CheckBox x:Name="IconTreatmentCheckBox"
+                                              Content="Unificar forma"
+                                              Style="{StaticResource SwitchCheckBox}"
+                                              Margin="0,12,0,0"
+                                              Checked="IconTreatmentCheckBox_Changed"
+                                              Unchecked="IconTreatmentCheckBox_Changed" />
+
+                                    <TextBlock Text="Color de tinte"
+                                               Foreground="{StaticResource TextSecondary}"
+                                               FontWeight="SemiBold"
+                                               Margin="0,16,0,8" />
+                                    <TextBox x:Name="IconTintTextBox"
+                                             Height="38"
+                                             Background="#0A0C10"
+                                             BorderBrush="{StaticResource BorderStrong}"
+                                             Foreground="{StaticResource TextPrimary}"
+                                             BorderThickness="1"
+                                             Padding="12,7"
+                                             TextChanged="IconTintTextBox_TextChanged" />
+
+                                    <TextBlock Text="Fuerza del tinte"
+                                               Foreground="{StaticResource TextSecondary}"
+                                               FontWeight="SemiBold"
+                                               Margin="0,18,0,8" />
+                                    <Slider x:Name="IconTintSlider"
+                                            Style="{StaticResource ModernSlider}"
+                                            Minimum="0"
+                                            Maximum="100"
+                                            TickFrequency="1"
+                                            ValueChanged="IconTintSlider_ValueChanged" />
+                                    <Border Height="34"
+                                            Margin="0,8,0,0"
+                                            CornerRadius="12"
+                                            Background="#0A0D12"
+                                            BorderBrush="{StaticResource BorderSoft}"
+                                            BorderThickness="1"
+                                            HorizontalAlignment="Stretch">
+                                        <TextBlock x:Name="IconTintValueText"
                                                    Foreground="{StaticResource TextPrimary}"
                                                    FontWeight="SemiBold"
                                                    HorizontalAlignment="Center"

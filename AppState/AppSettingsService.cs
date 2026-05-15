@@ -115,7 +115,12 @@ public sealed class AppSettingsService
             ThemeMode = settings.ThemeMode,
             ThemePresetId = presetId,
             CustomBackgroundColor = color,
-            CustomBackgroundOpacity = Math.Clamp(settings.CustomBackgroundOpacity, 0, 100)
+            CustomBackgroundOpacity = Math.Clamp(settings.CustomBackgroundOpacity, 0, 100),
+            IconTreatmentMode = settings.IconTreatmentMode,
+            IconTintColor = IsValidRgbHex(settings.IconTintColor)
+                ? settings.IconTintColor.ToUpperInvariant()
+                : "#F5F6F8",
+            IconTintStrength = Math.Clamp(settings.IconTintStrength, 0, 100)
         };
     }
 

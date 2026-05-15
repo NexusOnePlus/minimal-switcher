@@ -164,7 +164,8 @@ public class WindowService
             wi.Identifier = identifier;
             wi.AppName = GetDisplayName(identifier);
 
-            if (_iconCache.TryGetValue(identifier, out var cachedIcon))
+            var iconCacheKey = CreateIconCacheKey(identifier);
+            if (_iconCache.TryGetValue(iconCacheKey, out var cachedIcon))
             {
                 wi.Icon = cachedIcon;
             }
@@ -182,14 +183,23 @@ public class WindowService
 
                 if (newIcon != null)
                 {
-                    wi.Icon = newIcon;
-                    _iconCache[identifier] = newIcon;
+                    var processedIcon = IconAppearanceService.Apply(newIcon);
+                    if (processedIcon != null)
+                    {
+                        wi.Icon = processedIcon;
+                        _iconCache[iconCacheKey] = processedIcon;
+                    }
                 }
             }
         }
 
-        wi.Icon ??= GetSystemIcon(hWnd);
+        wi.Icon ??= IconAppearanceService.Apply(GetSystemIcon(hWnd));
         return wi;
+    }
+
+    private static string CreateIconCacheKey(string identifier)
+    {
+        return $"{identifier}|{IconAppearanceService.SettingsKey}";
     }
 
     private static string GetDisplayName(string identifier)

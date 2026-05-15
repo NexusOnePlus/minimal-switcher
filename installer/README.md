@@ -28,7 +28,10 @@ The script publishes the app to `artifacts/publish/win-x64` and writes the insta
 1. Update `<Version>` in `minimal-switcher.csproj`, or tag with `v<version>`.
 2. Push a tag such as `v0.2.0`.
 3. GitHub Actions builds `MinimalSwitcherSetup-0.2.0.exe`.
-4. The workflow uploads the installer as an artifact and attaches it to the GitHub Release for tag builds.
+4. The workflow uploads the installer as an artifact.
+5. For tag builds, the release publish job targets the `release` environment before attaching the installer to GitHub Releases.
+
+To require manual approval before publishing, create a GitHub Environment named `release` in the repository settings and add the required reviewers there. The installer artifact is already built before that approval step.
 
 ## Installer Features
 

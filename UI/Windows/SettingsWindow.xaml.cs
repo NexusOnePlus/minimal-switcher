@@ -34,6 +34,10 @@ public partial class SettingsWindow : Window
         CustomColorTextBox.Text = settings.CustomBackgroundColor;
         OpacitySlider.Value = settings.CustomBackgroundOpacity;
         OpacityValueText.Text = $"{settings.CustomBackgroundOpacity}%";
+        IconTreatmentCheckBox.IsChecked = settings.IconTreatmentMode == IconTreatmentMode.Unified;
+        IconTintTextBox.Text = settings.IconTintColor;
+        IconTintSlider.Value = settings.IconTintStrength;
+        IconTintValueText.Text = $"{settings.IconTintStrength}%";
         UpdatePreview(settings);
 
         _isLoading = false;
@@ -102,6 +106,37 @@ public partial class SettingsWindow : Window
 
         _viewModel.SetOpacity(opacity);
         UpdatePreview(_viewModel.Current);
+    }
+
+    private void IconTreatmentCheckBox_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_isLoading) return;
+
+        _viewModel.SetIconTreatment(IconTreatmentCheckBox.IsChecked == true);
+        RefreshWindowLists();
+    }
+
+    private void IconTintTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_isLoading) return;
+
+        var color = IconTintTextBox.Text.Trim();
+        if (!_viewModel.TrySetIconTintColor(color)) return;
+
+        RefreshWindowLists();
+    }
+
+    private void IconTintSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (IconTintValueText == null) return;
+
+        var strength = (int)Math.Round(e.NewValue);
+        IconTintValueText.Text = $"{strength}%";
+
+        if (_isLoading) return;
+
+        _viewModel.SetIconTintStrength(strength);
+        RefreshWindowLists();
     }
 
     private void TabButton_Checked(object sender, RoutedEventArgs e)

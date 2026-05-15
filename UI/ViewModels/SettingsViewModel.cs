@@ -95,12 +95,34 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
             ThemeMode = current.ThemeMode,
             ThemePresetId = current.ThemePresetId,
             CustomBackgroundColor = current.CustomBackgroundColor,
-            CustomBackgroundOpacity = current.CustomBackgroundOpacity
+            CustomBackgroundOpacity = current.CustomBackgroundOpacity,
+            IconTreatmentMode = current.IconTreatmentMode,
+            IconTintColor = current.IconTintColor,
+            IconTintStrength = current.IconTintStrength
         };
 
         update(next);
         _settingsService.Update(next);
         OnPropertyChanged(nameof(Current));
+    }
+
+    public void SetIconTreatment(bool enabled)
+    {
+        UpdateSettings(settings =>
+            settings.IconTreatmentMode = enabled ? IconTreatmentMode.Unified : IconTreatmentMode.Native);
+    }
+
+    public bool TrySetIconTintColor(string color)
+    {
+        if (!IsValidRgbHex(color)) return false;
+
+        UpdateSettings(settings => settings.IconTintColor = color);
+        return true;
+    }
+
+    public void SetIconTintStrength(int strength)
+    {
+        UpdateSettings(settings => settings.IconTintStrength = strength);
     }
 
     private static bool IsValidRgbHex(string value)
