@@ -156,11 +156,16 @@ public static class IconAppearanceService
         var cornerOpacity = GetCornerOpacityRatio(pixels, stride, source.PixelWidth, source.PixelHeight);
         var edgeOpacity = GetEdgeOpacityRatio(pixels, stride, source.PixelWidth, source.PixelHeight);
         var transparentCorners = cornerOpacity < 0.22;
+        var circleLike = transparentCorners
+            && fillRatio >= 0.68
+            && fillRatio <= 0.84
+            && edgeOpacity >= 0.56;
         var fullBleed = canvasRatio >= 0.9 && fillRatio >= 0.84 && !transparentCorners;
         var roundedSquare = canvasRatio >= 0.82
-            && fillRatio >= 0.72
-            && edgeOpacity >= 0.64;
-        var organicShape = transparentCorners && fillRatio < 0.84;
+            && fillRatio >= 0.68
+            && edgeOpacity >= 0.58
+            && !circleLike;
+        var organicShape = circleLike || (transparentCorners && fillRatio < 0.84);
         var needsBacking = organicShape || (!fullBleed && !roundedSquare && (fillRatio < 0.82 || canvasRatio < 0.84));
 
         var dominant = Color.FromRgb((byte)(red / opaque), (byte)(green / opaque), (byte)(blue / opaque));
