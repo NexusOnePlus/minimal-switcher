@@ -16,6 +16,7 @@ public partial class MainWindow : Window
 {
     private static readonly string LogPath = Path.Combine(Path.GetTempPath(), "minimal-switcher.log");
     private readonly WindowService _windowService = new();
+    private readonly AppThemeService _themeService = AppThemeService.Instance;
     private ObservableCollection<SwitcherItem> _items = new();
     private int _currentIndex;
     private GlassyEffect? _glassyEffect;
@@ -190,17 +191,12 @@ public partial class MainWindow : Window
         _glassyEffect = null;
         GlassyLayer.Effect = null;
 
-        var color = settings.ThemeMode == AppThemeMode.Custom
-            ? WithOpacity(settings.CustomBackgroundColor, settings.CustomBackgroundOpacity)
-            : WithOpacity(AppSettingsService.Instance.CurrentPreset.Background, settings.CustomBackgroundOpacity);
+        var color = _themeService.GetSwitcherBackground(settings);
+        var border = _themeService.GetSwitcherBorder(settings);
 
-        var border = settings.ThemeMode == AppThemeMode.Custom
-            ? "#33FFFFFF"
-            : AppSettingsService.Instance.CurrentPreset.Border;
-
-        WindowFrame.Background = BrushFromHex(color);
-        WindowFrame.BorderBrush = BrushFromHex(border);
-        GlassyLayer.Background = BrushFromHex(color);
+        WindowFrame.Background = _themeService.CreateBrush(color);
+        WindowFrame.BorderBrush = _themeService.CreateBrush(border);
+        GlassyLayer.Background = _themeService.CreateBrush(color);
         ContentOverlay.Background = Brushes.Transparent;
 
         UpdateWindowClip();
@@ -219,7 +215,7 @@ public partial class MainWindow : Window
         GlassyLayer.Background = _backdropBrush;
         _glassyEffect = new GlassyEffect();
         GlassyLayer.Effect = _glassyEffect;
-        ContentOverlay.Background = BrushFromHex("#2A000000");
+        ContentOverlay.Background = _themeService.CreateBrush("#2A000000");
 
         CaptureBehindWindow();
         UpdateBackdrop();
@@ -233,24 +229,6 @@ public partial class MainWindow : Window
 
         CompositionTarget.Rendering -= OnRendering;
         _isRenderingSubscribed = false;
-    }
-
-    private static Brush BrushFromHex(string hex)
-    {
-        return (Brush)new BrushConverter().ConvertFromString(hex)!;
-    }
-
-    private static string WithOpacity(string rgbHex, int opacity)
-    {
-        var alpha = (int)Math.Round(Math.Clamp(opacity, 0, 100) * 255 / 100.0);
-        var hex = rgbHex.TrimStart('#');
-
-        if (hex.Length == 8)
-        {
-            hex = hex[2..];
-        }
-
-        return $"#{alpha:X2}{hex}";
     }
 
     private void CaptureBehindWindow()

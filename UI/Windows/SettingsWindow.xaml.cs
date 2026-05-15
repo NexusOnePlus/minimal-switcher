@@ -1,6 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -11,14 +9,15 @@ namespace minimal_switcher;
 
 public partial class SettingsWindow : Window
 {
-    private readonly AppSettingsService _settingsService = AppSettingsService.Instance;
+    private readonly SettingsViewModel _viewModel = new();
+    private readonly AppThemeService _themeService = AppThemeService.Instance;
     private bool _isLoading;
 
     public SettingsWindow()
     {
         InitializeComponent();
         Icon = AppIconFactory.CreateWindowIcon();
-        PresetItems.ItemsSource = _settingsService.Presets;
+        PresetItems.ItemsSource = _viewModel.Presets;
         LoadSettings();
         RefreshWindowLists();
     }
@@ -27,7 +26,7 @@ public partial class SettingsWindow : Window
     {
         _isLoading = true;
 
-        var settings = _settingsService.Current;
+        var settings = _viewModel.Current;
         ShaderModeButton.IsChecked = settings.ThemeMode == AppThemeMode.Shader;
         PresetModeButton.IsChecked = settings.ThemeMode == AppThemeMode.Preset;
         CustomModeButton.IsChecked = settings.ThemeMode == AppThemeMode.Custom;
@@ -39,89 +38,56 @@ public partial class SettingsWindow : Window
         _isLoading = false;
     }
 
-    private void SaveSettings(Action<AppSettings> update)
-    {
-        if (_isLoading) return;
-
-        var current = _settingsService.Current;
-        var next = new AppSettings
-        {
-            ThemeMode = current.ThemeMode,
-            ThemePresetId = current.ThemePresetId,
-            CustomBackgroundColor = current.CustomBackgroundColor,
-            CustomBackgroundOpacity = current.CustomBackgroundOpacity
-        };
-
-        update(next);
-        _settingsService.Update(next);
-        UpdatePreview(_settingsService.Current);
-    }
-
     private void UpdatePreview(AppSettings settings)
     {
         if (settings.ThemeMode == AppThemeMode.Shader)
         {
-            PreviewCard.Background = BrushFromHex("#F0151517");
-            PreviewCard.BorderBrush = BrushFromHex("#55FFFFFF");
+            PreviewCard.Background = _themeService.CreateBrush("#F0151517");
+            PreviewCard.BorderBrush = _themeService.CreateBrush("#55FFFFFF");
             return;
         }
 
-        var background = settings.ThemeMode == AppThemeMode.Custom
-            ? WithOpacity(settings.CustomBackgroundColor, settings.CustomBackgroundOpacity)
-            : WithOpacity(_settingsService.CurrentPreset.Background, settings.CustomBackgroundOpacity);
-
-        var border = settings.ThemeMode == AppThemeMode.Custom
-            ? "#33FFFFFF"
-            : _settingsService.CurrentPreset.Border;
-
-        PreviewCard.Background = BrushFromHex(background);
-        PreviewCard.BorderBrush = BrushFromHex(border);
+        PreviewCard.Background = _themeService.CreateBrush(_themeService.GetSwitcherBackground(settings));
+        PreviewCard.BorderBrush = _themeService.CreateBrush(_themeService.GetSwitcherBorder(settings));
     }
 
     private void ThemeMode_Checked(object sender, RoutedEventArgs e)
     {
-        SaveSettings(settings =>
+        if (_isLoading) return;
+
+        if (sender == ShaderModeButton)
         {
-            if (sender == ShaderModeButton)
-            {
-                settings.ThemeMode = AppThemeMode.Shader;
-            }
-            else if (sender == PresetModeButton)
-            {
-                settings.ThemeMode = AppThemeMode.Preset;
-            }
-            else
-            {
-                settings.ThemeMode = AppThemeMode.Custom;
-            }
-        });
+            _viewModel.SetThemeMode(AppThemeMode.Shader);
+        }
+        else if (sender == PresetModeButton)
+        {
+            _viewModel.SetThemeMode(AppThemeMode.Preset);
+        }
+        else
+        {
+            _viewModel.SetThemeMode(AppThemeMode.Custom);
+        }
+
+        UpdatePreview(_viewModel.Current);
     }
 
     private void PresetButton_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: ThemePreset preset }) return;
 
-        SaveSettings(settings =>
-        {
-            settings.ThemeMode = AppThemeMode.Preset;
-            settings.ThemePresetId = preset.Id;
-        });
-
+        _viewModel.SetPreset(preset);
         LoadSettings();
     }
 
     private void CustomColorTextBox_TextChanged(object sender, TextChangedEventArgs e)
     {
-        var color = CustomColorTextBox.Text.Trim();
-        if (!IsValidRgbHex(color)) return;
+        if (_isLoading) return;
 
-        SaveSettings(settings =>
-        {
-            settings.ThemeMode = AppThemeMode.Custom;
-            settings.CustomBackgroundColor = color;
-        });
+        var color = CustomColorTextBox.Text.Trim();
+        if (!_viewModel.TrySetCustomColor(color)) return;
 
         CustomModeButton.IsChecked = true;
+        UpdatePreview(_viewModel.Current);
     }
 
     private void OpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -131,10 +97,10 @@ public partial class SettingsWindow : Window
         var opacity = (int)Math.Round(e.NewValue);
         OpacityValueText.Text = $"{opacity}%";
 
-        SaveSettings(settings =>
-        {
-            settings.CustomBackgroundOpacity = opacity;
-        });
+        if (_isLoading) return;
+
+        _viewModel.SetOpacity(opacity);
+        UpdatePreview(_viewModel.Current);
     }
 
     private void TabButton_Checked(object sender, RoutedEventArgs e)
@@ -160,7 +126,7 @@ public partial class SettingsWindow : Window
     {
         if (sender is Button { Tag: WindowItem item })
         {
-            WindowService.IgnoreWindow(item.Hwnd);
+            _viewModel.IgnoreWindow(item);
             RefreshWindowLists();
         }
     }
@@ -169,24 +135,16 @@ public partial class SettingsWindow : Window
     {
         if (sender is Button { Tag: WindowItem item })
         {
-            WindowService.RestoreWindow(item.Hwnd);
+            _viewModel.RestoreWindow(item);
             RefreshWindowLists();
         }
     }
 
     private void RefreshWindowLists()
     {
-        var recent = new List<WindowItem>();
-        foreach (var item in WindowService.GetRecentWindows())
-        {
-            if (!item.IsIgnored)
-            {
-                recent.Add(item);
-            }
-        }
-
-        RecentWindowsList.ItemsSource = recent;
-        IgnoredWindowsList.ItemsSource = WindowService.GetIgnoredWindows();
+        _viewModel.RefreshWindowLists();
+        RecentWindowsList.ItemsSource = _viewModel.RecentWindows;
+        IgnoredWindowsList.ItemsSource = _viewModel.IgnoredWindows;
     }
 
     private void CloseButton_Click(object sender, RoutedEventArgs e)
@@ -213,39 +171,6 @@ public partial class SettingsWindow : Window
 
         e.Cancel = true;
         Hide();
-    }
-
-    private static Brush BrushFromHex(string hex)
-    {
-        return (Brush)new BrushConverter().ConvertFromString(hex)!;
-    }
-
-    private static string WithOpacity(string rgbHex, int opacity)
-    {
-        var alpha = (int)Math.Round(Math.Clamp(opacity, 0, 100) * 255 / 100.0);
-        var hex = rgbHex.TrimStart('#');
-
-        if (hex.Length == 8)
-        {
-            hex = hex[2..];
-        }
-
-        return $"#{alpha:X2}{hex}";
-    }
-
-    private static bool IsValidRgbHex(string value)
-    {
-        if (value.Length != 7 || value[0] != '#') return false;
-
-        for (var i = 1; i < value.Length; i++)
-        {
-            if (!int.TryParse(value[i].ToString(), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out _))
-            {
-                return false;
-            }
-        }
-
-        return true;
     }
 
     private static bool HasInteractiveParent(DependencyObject source)
