@@ -23,7 +23,7 @@ class KeyboardHook
 
     private static bool _isAltDown = false;
     private static bool _isCustomAltTabActive = false;
-    private static MainWindow? selector;
+    private static readonly SwitcherController Switcher = SwitcherController.Instance;
 
     public static void Start()
     {
@@ -59,18 +59,14 @@ class KeyboardHook
                     _isCustomAltTabActive = true;
                     Debug.WriteLine("[HOOK] Custom Alt+Tab Sequence STARTED");
 
-                    Application.Current?.Dispatcher.Invoke(() =>
-                    {
-                        if (selector == null || !selector.IsLoaded) { selector = new MainWindow(); }
-                        selector.HandleAltTab(isFirstTime: true);
-                    });
+                    Application.Current?.Dispatcher.Invoke(Switcher.Begin);
                     return (IntPtr)1;
                 }
 
                 if (_isCustomAltTabActive && vkCode == VK_TAB)
                 {
                     Debug.WriteLine("[HOOK] Custom Alt+Tab NEXT");
-                    Application.Current?.Dispatcher.Invoke(() => selector?.HandleAltTab(isFirstTime: false));
+                    Application.Current?.Dispatcher.Invoke(Switcher.Next);
                     return (IntPtr)1;
                 }
             }
@@ -82,7 +78,7 @@ class KeyboardHook
                     {
                         RegistryHelper.RestoreSystemAltTab();
                         Debug.WriteLine("[HOOK] Custom Alt+Tab Sequence ENDED");
-                        Application.Current?.Dispatcher.Invoke(() => selector?.HandleAltRelease());
+                        Application.Current?.Dispatcher.Invoke(Switcher.Complete);
                         _isCustomAltTabActive = false;
                     }
                     _isAltDown = false;
