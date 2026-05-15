@@ -69,27 +69,6 @@ public static class IconAppearanceService
         }
     }
 
-    public static double GetSelectionScore(ImageSource? source)
-    {
-        if (source is not BitmapSource bitmapSource) return 0;
-
-        try
-        {
-            var bitmap = EnsureBgra32(bitmapSource);
-            var analysis = Analyze(bitmap);
-            var sourceSize = Math.Max(bitmapSource.PixelWidth, bitmapSource.PixelHeight);
-
-            if (analysis.IsFullBleed) return 3000 + sourceSize;
-            if (analysis.IsRoundedSquare) return 2000 + sourceSize;
-            if (!analysis.NeedsBacking) return 1200 + sourceSize;
-            return sourceSize;
-        }
-        catch
-        {
-            return 0;
-        }
-    }
-
     private static double GetRenderedInset(IconAnalysis analysis, AppSettings settings)
     {
         if (settings.IconTreatmentMode != IconTreatmentMode.Unified) return 0;
