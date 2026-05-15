@@ -155,15 +155,18 @@ public static class IconAppearanceService
         var canvasRatio = Math.Max(boundsWidth / (double)source.PixelWidth, boundsHeight / (double)source.PixelHeight);
         var cornerOpacity = GetCornerOpacityRatio(pixels, stride, source.PixelWidth, source.PixelHeight);
         var edgeOpacity = GetEdgeOpacityRatio(pixels, stride, source.PixelWidth, source.PixelHeight);
+        var roundedFit = GetRoundedSquareFit(pixels, stride, minX, minY, boundsWidth, boundsHeight);
         var transparentCorners = cornerOpacity < 0.22;
         var circleLike = transparentCorners
             && fillRatio >= 0.68
             && fillRatio <= 0.84
             && edgeOpacity >= 0.56;
         var fullBleed = canvasRatio >= 0.9 && fillRatio >= 0.84 && !transparentCorners;
-        var roundedSquare = canvasRatio >= 0.82
-            && fillRatio >= 0.68
-            && edgeOpacity >= 0.58
+        var roundedSquare = canvasRatio >= 0.78
+            && fillRatio >= 0.6
+            && edgeOpacity >= 0.5
+            && roundedFit.Coverage >= 0.84
+            && roundedFit.Leak <= 0.08
             && !circleLike;
         var organicShape = circleLike || (transparentCorners && fillRatio < 0.84);
         var needsBacking = organicShape || (!fullBleed && !roundedSquare && (fillRatio < 0.82 || canvasRatio < 0.84));
@@ -177,6 +180,57 @@ public static class IconAppearanceService
             Math.Min(source.PixelHeight - Math.Max(0, minY - padding), boundsHeight + padding * 2));
 
         return new IconAnalysis(fullBleed, roundedSquare, needsBacking, CreateBackingColor(dominant), crop);
+    }
+
+    private static ShapeFit GetRoundedSquareFit(byte[] pixels, int stride, int startX, int startY, int width, int height)
+    {
+        var radius = Math.Max(4.0, Math.Min(width, height) * 0.22);
+        var maskPixels = 0;
+        var visibleInside = 0;
+        var visibleOutside = 0;
+        var visibleTotal = 0;
+
+        for (var y = 0; y < height; y++)
+        {
+            for (var x = 0; x < width; x++)
+            {
+                var isVisible = pixels[(startY + y) * stride + (startX + x) * 4 + 3] >= 24;
+                var inMask = IsInsideRoundedRect(x + 0.5, y + 0.5, width, height, radius);
+
+                if (inMask) maskPixels++;
+                if (isVisible) visibleTotal++;
+                if (isVisible && inMask) visibleInside++;
+                if (isVisible && !inMask) visibleOutside++;
+            }
+        }
+
+        if (maskPixels == 0 || visibleTotal == 0)
+        {
+            return new ShapeFit(0, 1);
+        }
+
+        return new ShapeFit(
+            visibleInside / (double)maskPixels,
+            visibleOutside / (double)visibleTotal);
+    }
+
+    private static bool IsInsideRoundedRect(double x, double y, double width, double height, double radius)
+    {
+        var innerLeft = radius;
+        var innerRight = width - radius;
+        var innerTop = radius;
+        var innerBottom = height - radius;
+
+        if ((x >= innerLeft && x <= innerRight) || (y >= innerTop && y <= innerBottom))
+        {
+            return true;
+        }
+
+        var centerX = x < innerLeft ? innerLeft : innerRight;
+        var centerY = y < innerTop ? innerTop : innerBottom;
+        var dx = x - centerX;
+        var dy = y - centerY;
+        return dx * dx + dy * dy <= radius * radius;
     }
 
     private static double GetCornerOpacityRatio(byte[] pixels, int stride, int width, int height)
@@ -365,6 +419,7 @@ public static class IconAppearanceService
     }
 
     private sealed record HslColor(double Hue, double Saturation, double Lightness);
+    private sealed record ShapeFit(double Coverage, double Leak);
     private sealed record IconAnalysis(bool IsFullBleed, bool IsRoundedSquare, bool NeedsBacking, Color BackingColor, Int32Rect ContentBounds);
 }
 
