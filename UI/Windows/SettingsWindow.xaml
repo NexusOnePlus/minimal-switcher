@@ -484,6 +484,13 @@
                                  GroupName="SettingsTabs"
                                  Margin="6,0,0,0"
                                  Checked="TabButton_Checked" />
+                    <RadioButton x:Name="BehaviorTabButton"
+                                 Content="Flujo"
+                                 Tag="&#xE8AB;"
+                                 Style="{StaticResource NavButton}"
+                                 GroupName="SettingsTabs"
+                                 Margin="6,0,0,0"
+                                 Checked="TabButton_Checked" />
                     <RadioButton x:Name="AboutTabButton"
                                  Content="Acerca de"
                                  Tag="&#xE946;"
@@ -851,6 +858,47 @@
                         </Grid>
                     </StackPanel>
                 </ScrollViewer>
+
+                <Grid x:Name="BehaviorPanel" Visibility="Collapsed">
+                    <Border Width="520"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Top"
+                            CornerRadius="24"
+                            Background="{StaticResource SurfaceRaised}"
+                            BorderBrush="{StaticResource BorderSoft}"
+                            BorderThickness="1"
+                            Padding="18">
+                        <StackPanel>
+                            <TextBlock Text="Flujo"
+                                       Foreground="{StaticResource TextPrimary}"
+                                       FontSize="16"
+                                       FontWeight="SemiBold" />
+                            <TextBlock Text="Atajos y alcance del switcher"
+                                       Foreground="{StaticResource TextMuted}"
+                                       FontSize="11"
+                                       Margin="0,4,0,18" />
+
+                            <Border CornerRadius="18"
+                                    Background="#0A0D12"
+                                    BorderBrush="{StaticResource BorderSoft}"
+                                    BorderThickness="1"
+                                    Padding="16">
+                                <StackPanel>
+                                    <CheckBox x:Name="SameProcessShortcutCheckBox"
+                                              Content="Alt + ` alterna ventanas de la misma app"
+                                              Style="{StaticResource SwitchCheckBox}"
+                                              Checked="SameProcessShortcutCheckBox_Changed"
+                                              Unchecked="SameProcessShortcutCheckBox_Changed" />
+                                    <TextBlock Text="El switcher filtra por la app activa y mantiene Alt + Tab como cambio global."
+                                               Foreground="{StaticResource TextMuted}"
+                                               TextWrapping="Wrap"
+                                               FontSize="12"
+                                               Margin="0,10,0,0" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+                </Grid>
 
                 <Grid x:Name="IgnoredPanel" Visibility="Collapsed">
                     <Grid.ColumnDefinitions>

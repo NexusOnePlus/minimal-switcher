@@ -40,6 +40,7 @@ public partial class SettingsWindow : Window
         SyncIconColorPicker(settings.IconTintColor);
         IconTintSlider.Value = settings.IconTintStrength;
         IconTintValueText.Text = $"{settings.IconTintStrength}%";
+        SameProcessShortcutCheckBox.IsChecked = settings.EnableSameProcessShortcut;
         UpdatePreview(settings);
 
         _isLoading = false;
@@ -157,6 +158,13 @@ public partial class SettingsWindow : Window
         RefreshWindowLists();
     }
 
+    private void SameProcessShortcutCheckBox_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_isLoading) return;
+
+        _viewModel.SetSameProcessShortcut(SameProcessShortcutCheckBox.IsChecked == true);
+    }
+
     private void SetIconColor(string color)
     {
         _isSyncingIconColor = true;
@@ -206,12 +214,14 @@ public partial class SettingsWindow : Window
 
     private void TabButton_Checked(object sender, RoutedEventArgs e)
     {
-        if (AppearancePanel == null || IgnoredPanel == null || AboutPanel == null) return;
+        if (AppearancePanel == null || BehaviorPanel == null || IgnoredPanel == null || AboutPanel == null) return;
 
+        var showBehavior = sender == BehaviorTabButton;
         var showIgnored = sender == IgnoredTabButton;
         var showAbout = sender == AboutTabButton;
 
-        AppearancePanel.Visibility = !showIgnored && !showAbout ? Visibility.Visible : Visibility.Collapsed;
+        AppearancePanel.Visibility = !showBehavior && !showIgnored && !showAbout ? Visibility.Visible : Visibility.Collapsed;
+        BehaviorPanel.Visibility = showBehavior ? Visibility.Visible : Visibility.Collapsed;
         IgnoredPanel.Visibility = showIgnored ? Visibility.Visible : Visibility.Collapsed;
         AboutPanel.Visibility = showAbout ? Visibility.Visible : Visibility.Collapsed;
 

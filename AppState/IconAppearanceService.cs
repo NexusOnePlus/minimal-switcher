@@ -12,6 +12,9 @@ public static class IconAppearanceService
     private const double OrganicIconSize = 88;
     private const double RoundedSquareIconSize = 88;
     private const double FullBleedIconSize = 88;
+    private const double BackingInset = 4;
+    private const double BackingRadius = 20;
+    private const double BackingIconInset = 20;
 
     public static string SettingsKey
     {
@@ -50,7 +53,12 @@ public static class IconAppearanceService
                 {
                     var backing = new SolidColorBrush(analysis.BackingColor);
                     backing.Freeze();
-                    context.DrawRoundedRectangle(backing, null, new Rect(4, 4, 120, 120), 28, 28);
+                    var rect = new Rect(
+                        BackingInset,
+                        BackingInset,
+                        OutputSize - BackingInset * 2,
+                        OutputSize - BackingInset * 2);
+                    context.DrawRoundedRectangle(backing, null, rect, BackingRadius, BackingRadius);
                 }
 
                 context.DrawImage(crop, destination);
@@ -102,7 +110,7 @@ public static class IconAppearanceService
         if (settings.IconTreatmentMode != IconTreatmentMode.Unified) return 0;
         if (analysis.IsFullBleed) return 0;
         if (analysis.IsRoundedSquare) return 0;
-        if (analysis.NeedsBacking) return 20;
+        if (analysis.NeedsBacking) return BackingIconInset;
         return 6;
     }
 

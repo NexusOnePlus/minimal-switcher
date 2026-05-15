@@ -98,7 +98,8 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
             CustomBackgroundOpacity = current.CustomBackgroundOpacity,
             IconTreatmentMode = current.IconTreatmentMode,
             IconTintColor = current.IconTintColor,
-            IconTintStrength = current.IconTintStrength
+            IconTintStrength = current.IconTintStrength,
+            EnableSameProcessShortcut = current.EnableSameProcessShortcut
         };
 
         update(next);
@@ -123,6 +124,11 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
     public void SetIconTintStrength(int strength)
     {
         UpdateSettings(settings => settings.IconTintStrength = strength);
+    }
+
+    public void SetSameProcessShortcut(bool enabled)
+    {
+        UpdateSettings(settings => settings.EnableSameProcessShortcut = enabled);
     }
 
     private static bool IsValidRgbHex(string value)

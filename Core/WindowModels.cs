@@ -10,6 +10,12 @@ public enum AppType
     Aumid
 }
 
+public enum SwitcherFilter
+{
+    AllWindows,
+    SameProcess
+}
+
 public class WindowItem
 {
     public IntPtr Hwnd { get; set; }

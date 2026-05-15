@@ -2,6 +2,7 @@
 using System;
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
@@ -25,6 +26,8 @@ public partial class MainWindow : Window
     private RectangleGeometry? _windowClipRootClip;
     private bool _isRenderingSubscribed;
     private bool _useShaderTheme = true;
+    private IntPtr _activeSourceHwnd;
+    private SwitcherFilter _activeFilter = SwitcherFilter.AllWindows;
 
     public MainWindow()
     {
@@ -319,12 +322,14 @@ public partial class MainWindow : Window
         _backdropBrush.Viewbox = new Rect(x, y, width, height);
     }
 
-    public void HandleAltTab(bool isFirstTime)
+    public void HandleAltTab(bool isFirstTime, IntPtr sourceHwnd, SwitcherFilter filter)
     {
-        Log($"HandleAltTab isFirstTime={isFirstTime}");
+        Log($"HandleAltTab isFirstTime={isFirstTime} filter={filter}");
 
         if (isFirstTime)
         {
+                _activeSourceHwnd = sourceHwnd;
+                _activeFilter = filter;
                 RefreshWindows();
                 Log($"Refreshed {_items.Count} windows");
                 if (_items.Count == 0) return;
@@ -375,10 +380,25 @@ public partial class MainWindow : Window
         _items.Clear();
     }
 
+    public void CancelSwitch()
+    {
+        StopRecaptureTimer();
+
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd != IntPtr.Zero)
+        {
+            SetWindowDisplayAffinity(hwnd, WDA_NONE);
+        }
+
+        Hide();
+        _items.Clear();
+    }
+
     private void RefreshWindows()
     {
         _items.Clear();
         var windows = _windowService.EnumerateWindowsWithIcons();
+        windows = FilterWindows(windows);
         foreach (var w in windows)
         {
             _items.Add(new SwitcherItem
@@ -390,6 +410,30 @@ public partial class MainWindow : Window
                 IsSelected = false
             });
         }
+    }
+
+    private List<WindowItem> FilterWindows(List<WindowItem> windows)
+    {
+        if (_activeFilter != SwitcherFilter.SameProcess || _activeSourceHwnd == IntPtr.Zero)
+        {
+            return windows;
+        }
+
+        NativeMethods.GetWindowThreadProcessId(_activeSourceHwnd, out var sourcePid);
+        var source = windows.FirstOrDefault(w => w.Hwnd == _activeSourceHwnd);
+        if (source == null && sourcePid == 0)
+        {
+            return windows;
+        }
+
+        if (!string.IsNullOrWhiteSpace(source?.Identifier))
+        {
+            return windows
+                .Where(w => string.Equals(w.Identifier, source.Identifier, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+
+        return windows.Where(w => w.ProcessId == sourcePid).ToList();
     }
 
     private void UpdateSelection()

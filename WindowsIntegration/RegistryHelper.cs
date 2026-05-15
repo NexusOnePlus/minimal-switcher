@@ -35,7 +35,17 @@ public static class RegistryHelper
 
     public static void RestoreSystemAltTab()
     {
-        if (!_isHooked) return;
+        RestoreSystemAltTab(force: false);
+    }
+
+    public static void EnsureSystemAltTabRestored()
+    {
+        RestoreSystemAltTab(force: true);
+    }
+
+    private static void RestoreSystemAltTab(bool force)
+    {
+        if (!_isHooked && !force) return;
 
         try
         {
@@ -47,11 +57,12 @@ public static class RegistryHelper
                     {
                         key.SetValue(RegistryValueName, _originalValue);
                     }
-                    else
+                    else if (_isHooked || IsAppWrittenValue(key.GetValue(RegistryValueName)))
                     {
                         key.DeleteValue(RegistryValueName, false);
                     }
                     _isHooked = false;
+                    _originalValue = null;
                     Debug.WriteLine("[REGISTRY] System Alt+Tab RESTORED.");
                 }
             }
@@ -60,5 +71,10 @@ public static class RegistryHelper
         {
             Debug.WriteLine($"[REGISTRY] FAILED to restore Alt+Tab: {ex.Message}");
         }
+    }
+
+    private static bool IsAppWrittenValue(object? value)
+    {
+        return value is int intValue && intValue == 1;
     }
 }

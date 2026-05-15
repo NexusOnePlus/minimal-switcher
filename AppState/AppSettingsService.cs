@@ -120,7 +120,8 @@ public sealed class AppSettingsService
             IconTintColor = IsValidRgbHex(settings.IconTintColor)
                 ? settings.IconTintColor.ToUpperInvariant()
                 : "#F5F6F8",
-            IconTintStrength = Math.Clamp(settings.IconTintStrength, 0, 100)
+            IconTintStrength = Math.Clamp(settings.IconTintStrength, 0, 100),
+            EnableSameProcessShortcut = settings.EnableSameProcessShortcut
         };
     }
 

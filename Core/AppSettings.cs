@@ -22,6 +22,7 @@ public sealed class AppSettings
     public IconTreatmentMode IconTreatmentMode { get; set; } = IconTreatmentMode.Native;
     public string IconTintColor { get; set; } = "#F5F6F8";
     public int IconTintStrength { get; set; } = 0;
+    public bool EnableSameProcessShortcut { get; set; } = true;
 }
 
 public sealed record ThemePreset(

@@ -17,6 +17,7 @@ class KeyboardHook
     private const int VK_LMENU = 0xA4;
     private const int VK_RMENU = 0xA5;
     private const int VK_TAB = 0x09;
+    private const int VK_OEM_3 = 0xC0;
 
     private static LowLevelKeyboardProc _proc = HookCallback;
     private static IntPtr _hookID = IntPtr.Zero;
@@ -27,12 +28,42 @@ class KeyboardHook
 
     public static void Start()
     {
+        if (_hookID != IntPtr.Zero) return;
         _hookID = SetHook(_proc);
     }
 
     public static void Stop()
     {
+        ResetState();
+
+        if (_hookID == IntPtr.Zero) return;
+
         UnhookWindowsHookEx(_hookID);
+        _hookID = IntPtr.Zero;
+    }
+
+    private static void ResetState()
+    {
+        if (_isCustomAltTabActive)
+        {
+            try
+            {
+                var dispatcher = Application.Current?.Dispatcher;
+                if (dispatcher is { HasShutdownStarted: false, HasShutdownFinished: false })
+                {
+                    if (dispatcher.CheckAccess()) Switcher.Cancel();
+                    else dispatcher.Invoke(Switcher.Cancel);
+                }
+            }
+            catch
+            {
+                // Best effort cleanup during Windows logoff/process teardown.
+            }
+        }
+
+        RegistryHelper.RestoreSystemAltTab();
+        _isAltDown = false;
+        _isCustomAltTabActive = false;
     }
 
     private static IntPtr HookCallback(int nCode, IntPtr wParam, IntPtr lParam)
@@ -52,18 +83,28 @@ class KeyboardHook
                 {
                     _isAltDown = true;
                 }
-                RegistryHelper.DisableSystemAltTab();
 
-                if (_isAltDown && vkCode == VK_TAB && !isKeyRepeat && !_isCustomAltTabActive)
+                var isAltTab = vkCode == VK_TAB;
+                var isSameProcessShortcut = vkCode == VK_OEM_3
+                    && AppSettingsService.Instance.Current.EnableSameProcessShortcut;
+
+                if (_isAltDown && (isAltTab || isSameProcessShortcut) && !isKeyRepeat && !_isCustomAltTabActive)
                 {
-                    _isCustomAltTabActive = true;
-                    Debug.WriteLine("[HOOK] Custom Alt+Tab Sequence STARTED");
+                    var foregroundHwnd = NativeMethods.GetForegroundWindow();
+                    if (IsCurrentProcessWindow(foregroundHwnd))
+                    {
+                        return CallNextHookEx(_hookID, nCode, wParam, lParam);
+                    }
 
-                    Application.Current?.Dispatcher.Invoke(Switcher.Begin);
+                    _isCustomAltTabActive = true;
+                    var filter = isSameProcessShortcut ? SwitcherFilter.SameProcess : SwitcherFilter.AllWindows;
+                    Debug.WriteLine($"[HOOK] Custom Alt sequence STARTED ({filter})");
+
+                    Application.Current?.Dispatcher.Invoke(() => Switcher.Begin(foregroundHwnd, filter));
                     return (IntPtr)1;
                 }
 
-                if (_isCustomAltTabActive && vkCode == VK_TAB)
+                if (_isCustomAltTabActive && (vkCode == VK_TAB || vkCode == VK_OEM_3))
                 {
                     Debug.WriteLine("[HOOK] Custom Alt+Tab NEXT");
                     Application.Current?.Dispatcher.Invoke(Switcher.Next);
@@ -76,7 +117,6 @@ class KeyboardHook
                 {
                     if (_isCustomAltTabActive)
                     {
-                        RegistryHelper.RestoreSystemAltTab();
                         Debug.WriteLine("[HOOK] Custom Alt+Tab Sequence ENDED");
                         Application.Current?.Dispatcher.Invoke(Switcher.Complete);
                         _isCustomAltTabActive = false;
@@ -92,6 +132,14 @@ class KeyboardHook
         }
 
         return CallNextHookEx(_hookID, nCode, wParam, lParam);
+    }
+
+    private static bool IsCurrentProcessWindow(IntPtr hwnd)
+    {
+        if (hwnd == IntPtr.Zero) return false;
+
+        NativeMethods.GetWindowThreadProcessId(hwnd, out var processId);
+        return processId == (uint)Environment.ProcessId;
     }
 
     private static IntPtr SetHook(LowLevelKeyboardProc proc)

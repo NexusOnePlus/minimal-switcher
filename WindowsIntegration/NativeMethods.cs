@@ -107,6 +107,7 @@ internal static class NativeMethods
     [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr hWnd, int Msg, IntPtr wParam, IntPtr lParam);
     [DllImport("user32.dll")] public static extern bool DestroyIcon(IntPtr hIcon);
     [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+    [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
 
     [Flags] public enum ProcessAccessFlags : uint { QueryLimitedInformation = 0x1000 }
 

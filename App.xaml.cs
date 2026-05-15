@@ -1,5 +1,6 @@
 using System;
 using System.Windows;
+using Microsoft.Win32;
 using Drawing = System.Drawing;
 using Forms = System.Windows.Forms;
 
@@ -15,6 +16,10 @@ public partial class App : System.Windows.Application
 
     protected override void OnStartup(StartupEventArgs e)
     {
+        AppDomain.CurrentDomain.ProcessExit += OnProcessExit;
+        SystemEvents.SessionEnding += OnSessionEnding;
+        RegistryHelper.EnsureSystemAltTabRestored();
+
         if (HasArgument(e.Args, "--icon-debug"))
         {
             var window = new IconDebugWindow();
@@ -31,6 +36,8 @@ public partial class App : System.Windows.Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        AppDomain.CurrentDomain.ProcessExit -= OnProcessExit;
+        SystemEvents.SessionEnding -= OnSessionEnding;
         DisposeTrayIcon();
         KeyboardHook.Stop();
         base.OnExit(e);
@@ -85,7 +92,22 @@ public partial class App : System.Windows.Application
     private void ShutdownApplication()
     {
         IsShuttingDown = true;
+        KeyboardHook.Stop();
+        DisposeTrayIcon();
         Shutdown();
+    }
+
+    private void OnSessionEnding(object sender, Microsoft.Win32.SessionEndingEventArgs e)
+    {
+        IsShuttingDown = true;
+        KeyboardHook.Stop();
+        DisposeTrayIcon();
+    }
+
+    private static void OnProcessExit(object? sender, EventArgs e)
+    {
+        KeyboardHook.Stop();
+        RegistryHelper.EnsureSystemAltTabRestored();
     }
 
     private void DisposeTrayIcon()

@@ -108,11 +108,6 @@
                                         Property="BorderBrush"
                                         Value="#80FFFFFF"
                                     />
-                                    <Setter
-                                        TargetName="IconBorder"
-                                        Property="BorderThickness"
-                                        Value="2"
-                                    />
                                 </DataTrigger>
                             </DataTemplate.Triggers>
                         </DataTemplate>
