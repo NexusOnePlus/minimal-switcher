@@ -10,8 +10,8 @@ public static class IconAppearanceService
     private const int OutputSize = 128;
     private const double DefaultIconSize = 64;
     private const double OrganicIconSize = 64;
-    private const double RoundedSquareIconSize = 82;
-    private const double FullBleedIconSize = 86;
+    private const double RoundedSquareIconSize = 86;
+    private const double FullBleedIconSize = 88;
 
     public static string SettingsKey
     {
@@ -73,6 +73,7 @@ public static class IconAppearanceService
     {
         if (settings.IconTreatmentMode != IconTreatmentMode.Unified) return 0;
         if (analysis.IsFullBleed) return 0;
+        if (analysis.IsRoundedSquare) return 0;
         if (analysis.NeedsBacking) return 16;
         return 6;
     }
@@ -155,10 +156,10 @@ public static class IconAppearanceService
         var cornerOpacity = GetCornerOpacityRatio(pixels, stride, source.PixelWidth, source.PixelHeight);
         var edgeOpacity = GetEdgeOpacityRatio(pixels, stride, source.PixelWidth, source.PixelHeight);
         var transparentCorners = cornerOpacity < 0.22;
-        var fullBleed = canvasRatio >= 0.9 && fillRatio >= 0.86 && !transparentCorners;
+        var fullBleed = canvasRatio >= 0.9 && fillRatio >= 0.84 && !transparentCorners;
         var roundedSquare = canvasRatio >= 0.86
-            && fillRatio >= 0.84
-            && edgeOpacity >= 0.7;
+            && fillRatio >= 0.78
+            && edgeOpacity >= 0.78;
         var organicShape = transparentCorners && fillRatio < 0.84;
         var needsBacking = organicShape || (!fullBleed && !roundedSquare && (fillRatio < 0.82 || canvasRatio < 0.84));
 
