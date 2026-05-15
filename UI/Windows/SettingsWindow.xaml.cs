@@ -12,6 +12,7 @@ public partial class SettingsWindow : Window
     private readonly SettingsViewModel _viewModel = new();
     private readonly AppThemeService _themeService = AppThemeService.Instance;
     private bool _isLoading;
+    private bool _isSyncingIconColor;
 
     public SettingsWindow()
     {
@@ -36,6 +37,7 @@ public partial class SettingsWindow : Window
         OpacityValueText.Text = $"{settings.CustomBackgroundOpacity}%";
         IconTreatmentCheckBox.IsChecked = settings.IconTreatmentMode == IconTreatmentMode.Unified;
         IconTintTextBox.Text = settings.IconTintColor;
+        SyncIconColorPicker(settings.IconTintColor);
         IconTintSlider.Value = settings.IconTintStrength;
         IconTintValueText.Text = $"{settings.IconTintStrength}%";
         UpdatePreview(settings);
@@ -118,11 +120,12 @@ public partial class SettingsWindow : Window
 
     private void IconTintTextBox_TextChanged(object sender, TextChangedEventArgs e)
     {
-        if (_isLoading) return;
+        if (_isLoading || _isSyncingIconColor) return;
 
         var color = IconTintTextBox.Text.Trim();
         if (!_viewModel.TrySetIconTintColor(color)) return;
 
+        SyncIconColorPicker(color);
         RefreshWindowLists();
     }
 
@@ -130,7 +133,15 @@ public partial class SettingsWindow : Window
     {
         if (sender is not Button { Tag: string color }) return;
 
-        IconTintTextBox.Text = color;
+        SetIconColor(color);
+    }
+
+    private void IconColorSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_isLoading || _isSyncingIconColor || IconTintTextBox == null) return;
+
+        var color = $"#{(int)Math.Round(IconRedSlider.Value):X2}{(int)Math.Round(IconGreenSlider.Value):X2}{(int)Math.Round(IconBlueSlider.Value):X2}";
+        SetIconColor(color);
     }
 
     private void IconTintSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -144,6 +155,53 @@ public partial class SettingsWindow : Window
 
         _viewModel.SetIconTintStrength(strength);
         RefreshWindowLists();
+    }
+
+    private void SetIconColor(string color)
+    {
+        _isSyncingIconColor = true;
+        IconTintTextBox.Text = color;
+        SyncIconColorPicker(color);
+        _isSyncingIconColor = false;
+
+        if (_isLoading) return;
+        if (!_viewModel.TrySetIconTintColor(color)) return;
+
+        RefreshWindowLists();
+    }
+
+    private void SyncIconColorPicker(string color)
+    {
+        if (!TryParseHexColor(color, out var parsed)) return;
+
+        _isSyncingIconColor = true;
+        IconColorPreview.Background = new SolidColorBrush(parsed);
+        IconRedSlider.Value = parsed.R;
+        IconGreenSlider.Value = parsed.G;
+        IconBlueSlider.Value = parsed.B;
+        IconRedValueText.Text = parsed.R.ToString();
+        IconGreenValueText.Text = parsed.G.ToString();
+        IconBlueValueText.Text = parsed.B.ToString();
+        _isSyncingIconColor = false;
+    }
+
+    private static bool TryParseHexColor(string value, out Color color)
+    {
+        color = Colors.Transparent;
+        if (value.Length != 7 || value[0] != '#') return false;
+
+        try
+        {
+            color = Color.FromRgb(
+                Convert.ToByte(value.Substring(1, 2), 16),
+                Convert.ToByte(value.Substring(3, 2), 16),
+                Convert.ToByte(value.Substring(5, 2), 16));
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private void TabButton_Checked(object sender, RoutedEventArgs e)

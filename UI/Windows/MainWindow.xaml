@@ -50,6 +50,8 @@
                             >
                                 <Border
                                     x:Name="IconBorder"
+                                    Width="88"
+                                    Height="88"
                                     CornerRadius="14"
                                     Background="#10FFFFFF"
                                     BorderBrush="#20FFFFFF"
@@ -60,9 +62,10 @@
                                 >
                                     <Image
                                         Source="{Binding Icon}"
-                                        Width="64"
-                                        Height="64"
-                                        Margin="{Binding IconMargin}"
+                                        Width="{Binding IconSize}"
+                                        Height="{Binding IconSize}"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
                                         Stretch="Uniform"
                                         RenderOptions.BitmapScalingMode="HighQuality"
                                     />
@@ -70,7 +73,7 @@
                                 <TextBlock
                                     x:Name="ItemTitle"
                                     Text="{Binding Title}"
-                                    Width="76"
+                                    Width="88"
                                     Margin="0,4,0,0"
                                     Padding="4,0"
                                     FontSize="10"

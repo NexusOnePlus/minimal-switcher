@@ -168,7 +168,7 @@ public class WindowService
             if (_iconCache.TryGetValue(iconCacheKey, out var cachedIcon))
             {
                 wi.Icon = cachedIcon.Source;
-                wi.IconMargin = cachedIcon.Margin;
+                wi.IconSize = cachedIcon.Size;
             }
             else if (!NativeMethods.IsIconic(hWnd))
             {
@@ -186,7 +186,7 @@ public class WindowService
                 {
                     var processedIcon = IconAppearanceService.Apply(newIcon);
                     wi.Icon = processedIcon.Source;
-                    wi.IconMargin = processedIcon.Margin;
+                    wi.IconSize = processedIcon.Size;
                     _iconCache[iconCacheKey] = processedIcon;
                 }
             }
@@ -196,7 +196,7 @@ public class WindowService
         {
             var fallbackIcon = IconAppearanceService.Apply(GetSystemIcon(hWnd));
             wi.Icon = fallbackIcon.Source;
-            wi.IconMargin = fallbackIcon.Margin;
+            wi.IconSize = fallbackIcon.Size;
         }
         return wi;
     }

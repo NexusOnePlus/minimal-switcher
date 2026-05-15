@@ -8,7 +8,10 @@ namespace minimal_switcher;
 public static class IconAppearanceService
 {
     private const int OutputSize = 128;
-    private static readonly Thickness DefaultMargin = new(12);
+    private const double DefaultIconSize = 64;
+    private const double OrganicIconSize = 64;
+    private const double RoundedSquareIconSize = 82;
+    private const double FullBleedIconSize = 86;
 
     public static string SettingsKey
     {
@@ -21,12 +24,12 @@ public static class IconAppearanceService
 
     public static IconAppearance Apply(ImageSource? source)
     {
-        if (source is not BitmapSource bitmapSource) return new IconAppearance(source, DefaultMargin);
+        if (source is not BitmapSource bitmapSource) return new IconAppearance(source, DefaultIconSize);
 
         var settings = AppSettingsService.Instance.Current;
         if (settings.IconTreatmentMode == IconTreatmentMode.Native && settings.IconTintStrength == 0)
         {
-            return new IconAppearance(source, DefaultMargin);
+            return new IconAppearance(source, DefaultIconSize);
         }
 
         try
@@ -58,11 +61,11 @@ public static class IconAppearanceService
                 ? render
                 : RemapPalette(render, settings.IconTintColor, settings.IconTintStrength);
 
-            return new IconAppearance(image, GetLayoutMargin(analysis, settings));
+            return new IconAppearance(image, GetIconSize(analysis, settings));
         }
         catch
         {
-            return new IconAppearance(source, DefaultMargin);
+            return new IconAppearance(source, DefaultIconSize);
         }
     }
 
@@ -74,12 +77,12 @@ public static class IconAppearanceService
         return 6;
     }
 
-    private static Thickness GetLayoutMargin(IconAnalysis analysis, AppSettings settings)
+    private static double GetIconSize(IconAnalysis analysis, AppSettings settings)
     {
-        if (settings.IconTreatmentMode != IconTreatmentMode.Unified) return DefaultMargin;
-        if (analysis.IsFullBleed) return new Thickness(1);
-        if (analysis.NeedsBacking) return new Thickness(7);
-        return new Thickness(5);
+        if (settings.IconTreatmentMode != IconTreatmentMode.Unified) return DefaultIconSize;
+        if (analysis.IsFullBleed) return FullBleedIconSize;
+        if (analysis.IsRoundedSquare) return RoundedSquareIconSize;
+        return OrganicIconSize;
     }
 
     private static BitmapSource EnsureBgra32(BitmapSource source)
@@ -142,15 +145,22 @@ public static class IconAppearanceService
 
         if (opaque == 0)
         {
-            return new IconAnalysis(false, false, Color.FromRgb(28, 32, 40), new Int32Rect(0, 0, source.PixelWidth, source.PixelHeight));
+            return new IconAnalysis(false, false, false, Color.FromRgb(28, 32, 40), new Int32Rect(0, 0, source.PixelWidth, source.PixelHeight));
         }
 
         var boundsWidth = maxX - minX + 1;
         var boundsHeight = maxY - minY + 1;
         var fillRatio = opaque / (double)(boundsWidth * boundsHeight);
         var canvasRatio = Math.Max(boundsWidth / (double)source.PixelWidth, boundsHeight / (double)source.PixelHeight);
-        var fullBleed = canvasRatio >= 0.86 && fillRatio >= 0.72;
-        var needsBacking = !fullBleed && (fillRatio < 0.78 || canvasRatio < 0.82);
+        var cornerOpacity = GetCornerOpacityRatio(pixels, stride, source.PixelWidth, source.PixelHeight);
+        var edgeOpacity = GetEdgeOpacityRatio(pixels, stride, source.PixelWidth, source.PixelHeight);
+        var transparentCorners = cornerOpacity < 0.22;
+        var fullBleed = canvasRatio >= 0.9 && fillRatio >= 0.86 && !transparentCorners;
+        var roundedSquare = canvasRatio >= 0.86
+            && fillRatio >= 0.84
+            && edgeOpacity >= 0.7;
+        var organicShape = transparentCorners && fillRatio < 0.84;
+        var needsBacking = organicShape || (!fullBleed && !roundedSquare && (fillRatio < 0.82 || canvasRatio < 0.84));
 
         var dominant = Color.FromRgb((byte)(red / opaque), (byte)(green / opaque), (byte)(blue / opaque));
         var padding = needsBacking ? 2 : 0;
@@ -160,7 +170,57 @@ public static class IconAppearanceService
             Math.Min(source.PixelWidth - Math.Max(0, minX - padding), boundsWidth + padding * 2),
             Math.Min(source.PixelHeight - Math.Max(0, minY - padding), boundsHeight + padding * 2));
 
-        return new IconAnalysis(fullBleed, needsBacking, CreateBackingColor(dominant), crop);
+        return new IconAnalysis(fullBleed, roundedSquare, needsBacking, CreateBackingColor(dominant), crop);
+    }
+
+    private static double GetCornerOpacityRatio(byte[] pixels, int stride, int width, int height)
+    {
+        var sample = Math.Max(6, width / 8);
+        var opaque = 0;
+        var total = 0;
+
+        CountRegion(0, 0);
+        CountRegion(width - sample, 0);
+        CountRegion(0, height - sample);
+        CountRegion(width - sample, height - sample);
+        return total == 0 ? 0 : opaque / (double)total;
+
+        void CountRegion(int startX, int startY)
+        {
+            for (var y = startY; y < startY + sample; y++)
+            {
+                for (var x = startX; x < startX + sample; x++)
+                {
+                    total++;
+                    if (pixels[y * stride + x * 4 + 3] >= 24) opaque++;
+                }
+            }
+        }
+    }
+
+    private static double GetEdgeOpacityRatio(byte[] pixels, int stride, int width, int height)
+    {
+        var sample = Math.Max(6, width / 12);
+        var opaque = 0;
+        var total = 0;
+
+        CountRegion(width / 2 - sample / 2, 0, sample, sample);
+        CountRegion(width / 2 - sample / 2, height - sample, sample, sample);
+        CountRegion(0, height / 2 - sample / 2, sample, sample);
+        CountRegion(width - sample, height / 2 - sample / 2, sample, sample);
+        return total == 0 ? 0 : opaque / (double)total;
+
+        void CountRegion(int startX, int startY, int regionWidth, int regionHeight)
+        {
+            for (var y = startY; y < startY + regionHeight; y++)
+            {
+                for (var x = startX; x < startX + regionWidth; x++)
+                {
+                    total++;
+                    if (pixels[y * stride + x * 4 + 3] >= 24) opaque++;
+                }
+            }
+        }
     }
 
     private static BitmapSource CreateContentCrop(BitmapSource source, IconAnalysis analysis)
@@ -299,7 +359,7 @@ public static class IconAppearanceService
     }
 
     private sealed record HslColor(double Hue, double Saturation, double Lightness);
-    private sealed record IconAnalysis(bool IsFullBleed, bool NeedsBacking, Color BackingColor, Int32Rect ContentBounds);
+    private sealed record IconAnalysis(bool IsFullBleed, bool IsRoundedSquare, bool NeedsBacking, Color BackingColor, Int32Rect ContentBounds);
 }
 
-public sealed record IconAppearance(ImageSource? Source, Thickness Margin);
+public sealed record IconAppearance(ImageSource? Source, double Size);
