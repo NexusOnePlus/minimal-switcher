@@ -9,11 +9,16 @@ namespace minimal_switcher;
 public sealed class SettingsViewModel : INotifyPropertyChanged
 {
     private readonly AppSettingsService _settingsService = AppSettingsService.Instance;
+    private readonly AppInfoService _appInfo = AppInfoService.Instance;
 
     public IReadOnlyList<ThemePreset> Presets => _settingsService.Presets;
     public IReadOnlyList<WindowItem> RecentWindows { get; private set; } = [];
     public IReadOnlyList<WindowItem> IgnoredWindows { get; private set; } = [];
     public AppSettings Current => _settingsService.Current;
+    public string AppName => _appInfo.Name;
+    public string AppVersion => _appInfo.Version;
+    public string RepositoryUrl => _appInfo.RepositoryUrl;
+    public string ChangelogUrl => _appInfo.ChangelogUrl;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -77,6 +82,10 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
         WindowService.RestoreWindow(item.Hwnd);
         RefreshWindowLists();
     }
+
+    public void OpenRepository() => _appInfo.OpenUrl(RepositoryUrl);
+
+    public void OpenChangelog() => _appInfo.OpenUrl(ChangelogUrl);
 
     private void UpdateSettings(Action<AppSettings> update)
     {

@@ -4,6 +4,15 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
     <RootNamespace>minimal_switcher</RootNamespace>
+    <AssemblyName>minimal-switcher</AssemblyName>
+    <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
+    <Version>0.1.0</Version>
+    <AssemblyVersion>0.1.0.0</AssemblyVersion>
+    <FileVersion>0.1.0.0</FileVersion>
+    <InformationalVersion>0.1.0</InformationalVersion>
+    <Product>Minimal Switcher</Product>
+    <Authors>wv357</Authors>
+    <RepositoryUrl>https://github.com/wv357/minimal-switcher</RepositoryUrl>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
@@ -15,6 +24,13 @@
 
   <ItemGroup>
     <Resource Include="Shaders\GlassyEffect.ps" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>RepositoryUrl</_Parameter1>
+      <_Parameter2>https://github.com/wv357/minimal-switcher</_Parameter2>
+    </AssemblyAttribute>
   </ItemGroup>
 
 </Project>

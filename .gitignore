@@ -6,3 +6,4 @@ bin/
 *.suo
 .vs/
 .git.broken-worktree
+artifacts/

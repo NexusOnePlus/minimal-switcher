@@ -18,6 +18,7 @@ public partial class SettingsWindow : Window
         InitializeComponent();
         Icon = AppIconFactory.CreateWindowIcon();
         PresetItems.ItemsSource = _viewModel.Presets;
+        VersionText.Text = $"Version {_viewModel.AppVersion}";
         LoadSettings();
         RefreshWindowLists();
     }
@@ -105,16 +106,29 @@ public partial class SettingsWindow : Window
 
     private void TabButton_Checked(object sender, RoutedEventArgs e)
     {
-        if (AppearancePanel == null || IgnoredPanel == null) return;
+        if (AppearancePanel == null || IgnoredPanel == null || AboutPanel == null) return;
 
         var showIgnored = sender == IgnoredTabButton;
-        AppearancePanel.Visibility = showIgnored ? Visibility.Collapsed : Visibility.Visible;
+        var showAbout = sender == AboutTabButton;
+
+        AppearancePanel.Visibility = !showIgnored && !showAbout ? Visibility.Visible : Visibility.Collapsed;
         IgnoredPanel.Visibility = showIgnored ? Visibility.Visible : Visibility.Collapsed;
+        AboutPanel.Visibility = showAbout ? Visibility.Visible : Visibility.Collapsed;
 
         if (showIgnored)
         {
             RefreshWindowLists();
         }
+    }
+
+    private void OpenRepositoryButton_Click(object sender, RoutedEventArgs e)
+    {
+        _viewModel.OpenRepository();
+    }
+
+    private void OpenChangelogButton_Click(object sender, RoutedEventArgs e)
+    {
+        _viewModel.OpenChangelog();
     }
 
     private void RefreshWindowsButton_Click(object sender, RoutedEventArgs e)

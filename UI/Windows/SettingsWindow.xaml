@@ -407,6 +407,13 @@
                                  GroupName="SettingsTabs"
                                  Margin="6,0,0,0"
                                  Checked="TabButton_Checked" />
+                    <RadioButton x:Name="AboutTabButton"
+                                 Content="Acerca de"
+                                 Tag="&#xE946;"
+                                 Style="{StaticResource NavButton}"
+                                 GroupName="SettingsTabs"
+                                 Margin="6,0,0,0"
+                                 Checked="TabButton_Checked" />
                 </StackPanel>
             </Border>
 
@@ -730,6 +737,76 @@
                                 </ListBox.ItemTemplate>
                             </ListBox>
                         </Grid>
+                    </Border>
+                </Grid>
+
+                <Grid x:Name="AboutPanel" Visibility="Collapsed">
+                    <Border Width="460"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Top"
+                            CornerRadius="26"
+                            Background="{StaticResource SurfaceRaised}"
+                            BorderBrush="{StaticResource BorderSoft}"
+                            BorderThickness="1"
+                            Padding="24">
+                        <StackPanel>
+                            <TextBlock Text="Minimal Switcher"
+                                       Foreground="{StaticResource TextPrimary}"
+                                       FontSize="22"
+                                       FontWeight="SemiBold"
+                                       TextAlignment="Center" />
+                            <TextBlock x:Name="VersionText"
+                                       Foreground="{StaticResource TextSecondary}"
+                                       FontSize="13"
+                                       TextAlignment="Center"
+                                       Margin="0,6,0,22" />
+
+                            <Border CornerRadius="18"
+                                    Background="#0A0D12"
+                                    BorderBrush="{StaticResource BorderSoft}"
+                                    BorderThickness="1"
+                                    Padding="16">
+                                <StackPanel>
+                                    <TextBlock Text="Distribucion"
+                                               Foreground="{StaticResource TextPrimary}"
+                                               FontWeight="SemiBold" />
+                                    <TextBlock Text="Las versiones y notas se publican en GitHub Releases."
+                                               Foreground="{StaticResource TextMuted}"
+                                               TextWrapping="Wrap"
+                                               FontSize="12"
+                                               Margin="0,4,0,14" />
+                                    <UniformGrid Columns="2">
+                                        <Button Content="Repositorio"
+                                                Style="{StaticResource PillButton}"
+                                                Margin="0,0,6,0"
+                                                Click="OpenRepositoryButton_Click" />
+                                        <Button Content="Changelog"
+                                                Style="{StaticResource PillButton}"
+                                                Margin="6,0,0,0"
+                                                Click="OpenChangelogButton_Click" />
+                                    </UniformGrid>
+                                </StackPanel>
+                            </Border>
+
+                            <Border CornerRadius="18"
+                                    Background="#0A0D12"
+                                    BorderBrush="{StaticResource BorderSoft}"
+                                    BorderThickness="1"
+                                    Padding="16"
+                                    Margin="0,14,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="Actualizaciones"
+                                               Foreground="{StaticResource TextPrimary}"
+                                               FontWeight="SemiBold" />
+                                    <TextBlock x:Name="UpdateStatusText"
+                                               Text="Las actualizaciones se publican como instaladores en GitHub Releases."
+                                               Foreground="{StaticResource TextMuted}"
+                                               TextWrapping="Wrap"
+                                               FontSize="12"
+                                               Margin="0,4,0,0" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
                     </Border>
                 </Grid>
             </Grid>
