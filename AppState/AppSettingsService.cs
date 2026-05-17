@@ -122,7 +122,13 @@ public sealed class AppSettingsService
                 : "#F5F6F8",
             IconTintStrength = Math.Clamp(settings.IconTintStrength, 0, 100),
             EnableSameProcessShortcut = settings.EnableSameProcessShortcut,
-            CombineAppInstances = settings.CombineAppInstances
+            CombineAppInstances = settings.CombineAppInstances,
+            UseZoomSelection = settings.UseZoomSelection,
+            SelectionBorderColor = IsValidRgbHex(settings.SelectionBorderColor)
+                ? settings.SelectionBorderColor.ToUpperInvariant()
+                : "#FFFFFF",
+            SelectionBorderOpacity = Math.Clamp(settings.SelectionBorderOpacity, 0, 100),
+            SelectionZoomPercent = Math.Clamp(settings.SelectionZoomPercent, 0, 40)
         };
     }
 

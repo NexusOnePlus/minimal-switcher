@@ -100,7 +100,11 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
             IconTintColor = current.IconTintColor,
             IconTintStrength = current.IconTintStrength,
             EnableSameProcessShortcut = current.EnableSameProcessShortcut,
-            CombineAppInstances = current.CombineAppInstances
+            CombineAppInstances = current.CombineAppInstances,
+            UseZoomSelection = current.UseZoomSelection,
+            SelectionBorderColor = current.SelectionBorderColor,
+            SelectionBorderOpacity = current.SelectionBorderOpacity,
+            SelectionZoomPercent = current.SelectionZoomPercent
         };
 
         update(next);
@@ -111,6 +115,29 @@ public sealed class SettingsViewModel : INotifyPropertyChanged
     public void SetCombineAppInstances(bool enabled)
     {
         UpdateSettings(settings => settings.CombineAppInstances = enabled);
+    }
+
+    public void SetZoomSelection(bool enabled)
+    {
+        UpdateSettings(settings => settings.UseZoomSelection = enabled);
+    }
+
+    public bool TrySetSelectionBorderColor(string color)
+    {
+        if (!IsValidRgbHex(color)) return false;
+
+        UpdateSettings(settings => settings.SelectionBorderColor = color);
+        return true;
+    }
+
+    public void SetSelectionBorderOpacity(int opacity)
+    {
+        UpdateSettings(settings => settings.SelectionBorderOpacity = opacity);
+    }
+
+    public void SetSelectionZoomPercent(int percent)
+    {
+        UpdateSettings(settings => settings.SelectionZoomPercent = percent);
     }
 
     public void SetIconTreatment(bool enabled)

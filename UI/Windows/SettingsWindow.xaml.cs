@@ -42,6 +42,13 @@ public partial class SettingsWindow : Window
         IconTintValueText.Text = $"{settings.IconTintStrength}%";
         SameProcessShortcutCheckBox.IsChecked = settings.EnableSameProcessShortcut;
         CombineAppInstancesCheckBox.IsChecked = settings.CombineAppInstances;
+        ZoomSelectionCheckBox.IsChecked = settings.UseZoomSelection;
+        SelectionBorderColorTextBox.Text = settings.SelectionBorderColor;
+        SyncSelectionBorderPreview(settings.SelectionBorderColor);
+        SelectionBorderOpacitySlider.Value = settings.SelectionBorderOpacity;
+        SelectionBorderOpacityValueText.Text = $"{settings.SelectionBorderOpacity}%";
+        SelectionZoomSlider.Value = settings.SelectionZoomPercent;
+        SelectionZoomValueText.Text = $"{settings.SelectionZoomPercent}%";
         UpdatePreview(settings);
 
         _isLoading = false;
@@ -52,6 +59,52 @@ public partial class SettingsWindow : Window
         if (_isLoading) return;
 
         _viewModel.SetCombineAppInstances(CombineAppInstancesCheckBox.IsChecked == true);
+    }
+
+    private void ZoomSelectionCheckBox_Changed(object sender, RoutedEventArgs e)
+    {
+        if (_isLoading) return;
+
+        _viewModel.SetZoomSelection(ZoomSelectionCheckBox.IsChecked == true);
+    }
+
+    private void SelectionBorderColorTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_isLoading) return;
+
+        var color = SelectionBorderColorTextBox.Text.Trim();
+        if (!_viewModel.TrySetSelectionBorderColor(color)) return;
+
+        SyncSelectionBorderPreview(color);
+    }
+
+    private void SelectionBorderOpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (SelectionBorderOpacityValueText == null) return;
+
+        var opacity = (int)Math.Round(e.NewValue);
+        SelectionBorderOpacityValueText.Text = $"{opacity}%";
+
+        if (_isLoading) return;
+        _viewModel.SetSelectionBorderOpacity(opacity);
+    }
+
+    private void SelectionZoomSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (SelectionZoomValueText == null) return;
+
+        var zoom = (int)Math.Round(e.NewValue);
+        SelectionZoomValueText.Text = $"{zoom}%";
+
+        if (_isLoading) return;
+        _viewModel.SetSelectionZoomPercent(zoom);
+    }
+
+    private void SyncSelectionBorderPreview(string color)
+    {
+        if (SelectionBorderPreview == null || !TryParseHexColor(color, out var parsed)) return;
+
+        SelectionBorderPreview.Background = new SolidColorBrush(parsed);
     }
 
     private void UpdatePreview(AppSettings settings)

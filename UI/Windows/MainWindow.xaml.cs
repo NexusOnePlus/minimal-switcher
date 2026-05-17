@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -54,8 +55,7 @@ public partial class MainWindow : Window
         exStyle &= ~WS_EX_APPWINDOW;
         SetWindowLong(hwnd, GWL_EXSTYLE, exStyle);
         SetBlurBehind(hwnd);
-        // Exclude from our capture, but we'll re-enable for recorders later
-        SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE);
+        SetWindowDisplayAffinity(hwnd, WDA_NONE);
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
@@ -177,6 +177,7 @@ public partial class MainWindow : Window
     private void OnSettingsChanged(object? sender, EventArgs e)
     {
         ApplyTheme();
+        ApplySelectionMode();
     }
 
     private void ApplyTheme()
@@ -190,6 +191,7 @@ public partial class MainWindow : Window
             return;
         }
 
+        SetCaptureVisibility(excludeFromCapture: false);
         StopRecaptureTimer();
         _glassyEffect = null;
         GlassyLayer.Effect = null;
@@ -238,22 +240,35 @@ public partial class MainWindow : Window
     {
         var hwnd = new WindowInteropHelper(this).Handle;
         
-        // Use SetWindowDisplayAffinity to exclude from our capture
-        // This prevents self-capture without hide/show flicker
-        if (hwnd != IntPtr.Zero)
+        if (!_useShaderTheme)
         {
-            SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE);
+            SetCaptureVisibility(excludeFromCapture: false);
+            return;
         }
+
+        SetCaptureVisibility(excludeFromCapture: true);
 
         ScreenCaptureHelper.CaptureFullScreen();
 
-        if (hwnd != IntPtr.Zero)
-        {
-            // Reset so recorders can see us
-            SetWindowDisplayAffinity(hwnd, WDA_NONE);
-        }
+        SetCaptureVisibility(excludeFromCapture: false);
 
         UpdateBackdrop();
+    }
+
+    private void SetCaptureVisibility(bool excludeFromCapture)
+    {
+        var hwnd = new WindowInteropHelper(this).Handle;
+        if (hwnd == IntPtr.Zero) return;
+
+        SetWindowDisplayAffinity(hwnd, excludeFromCapture ? WDA_EXCLUDEFROMCAPTURE : WDA_NONE);
+    }
+
+    private void EnsureCaptureVisible()
+    {
+        SetCaptureVisibility(excludeFromCapture: false);
+        Dispatcher.BeginInvoke(
+            new Action(() => SetCaptureVisibility(excludeFromCapture: false)),
+            DispatcherPriority.Background);
     }
 
     private void UpdateGlassyParameters()
@@ -336,6 +351,7 @@ public partial class MainWindow : Window
                 _currentIndex = _items.Count > 1 ? 1 : 0;
                 if (_useShaderTheme) CaptureBehindWindow();
                 Show();
+                if (!_useShaderTheme) EnsureCaptureVisible();
                 Activate();
                 StartRecaptureTimer();
         }
@@ -385,6 +401,7 @@ public partial class MainWindow : Window
         Hide();
         System.Threading.Thread.Sleep(90);
         ForceForegroundWindow(selected.Hwnd);
+        _ = ReassertForegroundAsync(selected.Hwnd);
         _items.Clear();
     }
 
@@ -425,8 +442,27 @@ public partial class MainWindow : Window
                 Title = w.Title,
                 Icon = w.Icon,
                 IconSize = w.IconSize,
+                UseZoomSelection = AppSettingsService.Instance.Current.UseZoomSelection,
+                SelectionBorderColor = AppSettingsService.Instance.Current.SelectionBorderColor,
+                SelectionBorderOpacity = AppSettingsService.Instance.Current.SelectionBorderOpacity,
+                SelectionZoomPercent = AppSettingsService.Instance.Current.SelectionZoomPercent,
                 IsSelected = false
             });
+        }
+    }
+
+    private void ApplySelectionMode()
+    {
+        var useZoomSelection = AppSettingsService.Instance.Current.UseZoomSelection;
+        var selectionBorderColor = AppSettingsService.Instance.Current.SelectionBorderColor;
+        var selectionBorderOpacity = AppSettingsService.Instance.Current.SelectionBorderOpacity;
+        var selectionZoomPercent = AppSettingsService.Instance.Current.SelectionZoomPercent;
+        foreach (var item in _items)
+        {
+            item.UseZoomSelection = useZoomSelection;
+            item.SelectionBorderColor = selectionBorderColor;
+            item.SelectionBorderOpacity = selectionBorderOpacity;
+            item.SelectionZoomPercent = selectionZoomPercent;
         }
     }
 
@@ -524,6 +560,7 @@ public partial class MainWindow : Window
             }
 
             NativeMethods.BringWindowToTop(hwnd);
+            PulseAltKey();
             SetForegroundWindow(hwnd);
             NativeMethods.SetFocus(hwnd);
             NativeMethods.SwitchToThisWindow(hwnd, true);
@@ -541,6 +578,50 @@ public partial class MainWindow : Window
                 AttachThreadInput(currentThreadId, targetThreadId, false);
             }
         }
+    }
+
+    private async Task ReassertForegroundAsync(IntPtr hwnd)
+    {
+        await Task.Delay(140);
+        if (NativeMethods.IsWindow(hwnd))
+        {
+            ForceForegroundWindow(hwnd);
+        }
+
+        await Task.Delay(220);
+        if (NativeMethods.IsWindow(hwnd))
+        {
+            ForceForegroundWindow(hwnd);
+        }
+    }
+
+    private static void PulseAltKey()
+    {
+        var inputs = new[]
+        {
+            new NativeMethods.INPUT
+            {
+                type = NativeMethods.INPUT_KEYBOARD,
+                u = new NativeMethods.InputUnion
+                {
+                    ki = new NativeMethods.KEYBDINPUT { wVk = NativeMethods.VK_MENU }
+                }
+            },
+            new NativeMethods.INPUT
+            {
+                type = NativeMethods.INPUT_KEYBOARD,
+                u = new NativeMethods.InputUnion
+                {
+                    ki = new NativeMethods.KEYBDINPUT
+                    {
+                        wVk = NativeMethods.VK_MENU,
+                        dwFlags = NativeMethods.KEYEVENTF_KEYUP
+                    }
+                }
+            }
+        };
+
+        NativeMethods.SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<NativeMethods.INPUT>());
     }
 
     private void IconBorder_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
