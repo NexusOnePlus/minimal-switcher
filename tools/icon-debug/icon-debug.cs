@@ -1,11 +1,14 @@
-#:property TargetFramework net10.0-windows
-#:property EnableWindowsTargeting true
+#:property TargetFramework=net10.0-windows
+#:property EnableWindowsTargeting=true
+#:property BuiltInComInteropSupport=true
+#:package System.Drawing.Common@10.0.0
 
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Globalization;
 using System.Net;
+using System.Runtime.InteropServices;
 using System.Text;
 
 const int OutputSize = 128;
@@ -47,13 +50,37 @@ static Bitmap LoadBitmap(string path)
     if (extension.Equals(".exe", StringComparison.OrdinalIgnoreCase)
         || extension.Equals(".dll", StringComparison.OrdinalIgnoreCase))
     {
-        using var icon = Icon.ExtractAssociatedIcon(path)
-            ?? throw new InvalidOperationException("No associated icon was found.");
-        return icon.ToBitmap();
+        return LoadShellIcon(path, 256)
+            ?? throw new InvalidOperationException("No shell icon was found.");
     }
 
     using var image = Image.FromFile(path);
     return new Bitmap(image);
+}
+
+static Bitmap? LoadShellIcon(string path, int size)
+{
+    nint hBitmap = 0;
+    object? shellItem = null;
+
+    try
+    {
+        var iid = typeof(IShellItemImageFactory).GUID;
+        var hr = SHCreateItemFromParsingName(path, 0, ref iid, out shellItem);
+        if (hr != 0 || shellItem is not IShellItemImageFactory factory) return null;
+
+        var requested = new SIZE(size, size);
+        hr = factory.GetImage(requested, SIIGBF.ICONONLY, out hBitmap);
+        if (hr != 0 || hBitmap == 0) return null;
+
+        using var shellBitmap = Image.FromHbitmap(hBitmap);
+        return new Bitmap(shellBitmap);
+    }
+    finally
+    {
+        if (hBitmap != 0) DeleteObject(hBitmap);
+        if (shellItem != null) Marshal.ReleaseComObject(shellItem);
+    }
 }
 
 static Bitmap ResizeToBgra(Image source, int width, int height)
@@ -251,22 +278,17 @@ static double GetCornerOpacityRatio(Bitmap bitmap)
     var opaque = 0;
     var total = 0;
 
-    CountRegion(0, 0);
-    CountRegion(bitmap.Width - sample, 0);
-    CountRegion(0, bitmap.Height - sample);
-    CountRegion(bitmap.Width - sample, bitmap.Height - sample);
+    AddRegion(0, 0, sample, sample);
+    AddRegion(bitmap.Width - sample, 0, sample, sample);
+    AddRegion(0, bitmap.Height - sample, sample, sample);
+    AddRegion(bitmap.Width - sample, bitmap.Height - sample, sample, sample);
     return total == 0 ? 0 : opaque / (double)total;
 
-    void CountRegion(int startX, int startY)
+    void AddRegion(int startX, int startY, int regionWidth, int regionHeight)
     {
-        for (var y = startY; y < startY + sample; y++)
-        {
-            for (var x = startX; x < startX + sample; x++)
-            {
-                total++;
-                if (bitmap.GetPixel(x, y).A >= AlphaThreshold) opaque++;
-            }
-        }
+        var (regionOpaque, regionTotal) = CountOpaqueRegion(bitmap, startX, startY, regionWidth, regionHeight);
+        opaque += regionOpaque;
+        total += regionTotal;
     }
 }
 
@@ -276,23 +298,35 @@ static double GetEdgeOpacityRatio(Bitmap bitmap)
     var opaque = 0;
     var total = 0;
 
-    CountRegion(bitmap.Width / 2 - sample / 2, 0, sample, sample);
-    CountRegion(bitmap.Width / 2 - sample / 2, bitmap.Height - sample, sample, sample);
-    CountRegion(0, bitmap.Height / 2 - sample / 2, sample, sample);
-    CountRegion(bitmap.Width - sample, bitmap.Height / 2 - sample / 2, sample, sample);
+    AddRegion(bitmap.Width / 2 - sample / 2, 0, sample, sample);
+    AddRegion(bitmap.Width / 2 - sample / 2, bitmap.Height - sample, sample, sample);
+    AddRegion(0, bitmap.Height / 2 - sample / 2, sample, sample);
+    AddRegion(bitmap.Width - sample, bitmap.Height / 2 - sample / 2, sample, sample);
     return total == 0 ? 0 : opaque / (double)total;
 
-    void CountRegion(int startX, int startY, int regionWidth, int regionHeight)
+    void AddRegion(int startX, int startY, int regionWidth, int regionHeight)
     {
-        for (var y = startY; y < startY + regionHeight; y++)
+        var (regionOpaque, regionTotal) = CountOpaqueRegion(bitmap, startX, startY, regionWidth, regionHeight);
+        opaque += regionOpaque;
+        total += regionTotal;
+    }
+}
+
+static (int opaque, int total) CountOpaqueRegion(Bitmap bitmap, int startX, int startY, int regionWidth, int regionHeight)
+{
+    var opaque = 0;
+    var total = 0;
+
+    for (var y = startY; y < startY + regionHeight; y++)
+    {
+        for (var x = startX; x < startX + regionWidth; x++)
         {
-            for (var x = startX; x < startX + regionWidth; x++)
-            {
-                total++;
-                if (bitmap.GetPixel(x, y).A >= AlphaThreshold) opaque++;
-            }
+            total++;
+            if (bitmap.GetPixel(x, y).A >= AlphaThreshold) opaque++;
         }
     }
+
+    return (opaque, total);
 }
 
 static bool IsInsideRoundedRect(double x, double y, double width, double height, double radius)
@@ -370,6 +404,17 @@ static string CreateReport(string inputPath, IconAnalysis analysis)
     """;
 }
 
+[DllImport("shell32.dll", CharSet = CharSet.Unicode, PreserveSig = true)]
+static extern int SHCreateItemFromParsingName(
+    string pszPath,
+    nint pbc,
+    ref Guid riid,
+    [MarshalAs(UnmanagedType.Interface)] out object? ppv);
+
+[DllImport("gdi32.dll")]
+[return: MarshalAs(UnmanagedType.Bool)]
+static extern bool DeleteObject(nint hObject);
+
 record ShapeFit(double MissingInside, double OutsideLeak, double Scale, double RadiusFactor)
 {
     public double TotalError => MissingInside + OutsideLeak * 1.8;
@@ -386,3 +431,21 @@ record IconAnalysis(
     bool IsFullBleed,
     bool IsRoundedSquare,
     bool NeedsBacking);
+
+[StructLayout(LayoutKind.Sequential)]
+readonly record struct SIZE(int cx, int cy);
+
+[Flags]
+enum SIIGBF
+{
+    ICONONLY = 0x00000004
+}
+
+[ComImport]
+[Guid("bcc18b79-ba16-442f-80c4-8a59c30c463b")]
+[InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IShellItemImageFactory
+{
+    [PreserveSig]
+    int GetImage(SIZE size, SIIGBF flags, out nint phbm);
+}

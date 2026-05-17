@@ -96,7 +96,9 @@ public partial class IconDebugWindow : Window
             $"CornerOpacity  {debug.CornerOpacity:0.000}\n" +
             $"EdgeOpacity    {debug.EdgeOpacity:0.000}\n" +
             $"MissingInside  {debug.MissingInside:0.000}\n" +
-            $"OutsideLeak    {debug.OutsideLeak:0.000}";
+            $"OutsideLeak    {debug.OutsideLeak:0.000}\n" +
+            $"SmallContent   {debug.HasSmallInnerContent}\n" +
+            $"ContentBounds  {debug.ContentBounds.X},{debug.ContentBounds.Y} {debug.ContentBounds.Width}x{debug.ContentBounds.Height}";
     }
 
     private static BitmapSource? LoadImageSource(string path)

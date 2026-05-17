@@ -7,7 +7,7 @@ namespace minimal_switcher;
 
 public static class IconAppearanceService
 {
-    private const int AlgorithmVersion = 6;
+    private const int AlgorithmVersion = 9;
     private const int OutputSize = 128;
     private const double DefaultIconSize = 68;
     private const double OrganicIconSize = 88;
@@ -44,7 +44,7 @@ public static class IconAppearanceService
             var crop = CreateContentCrop(bitmap, analysis);
             var iconInset = GetRenderedInset(analysis, settings);
             var destination = ShouldFillUnifiedFrame(analysis, settings)
-                ? new Rect(0, 0, OutputSize, OutputSize)
+                ? CreateOverscanRect()
                 : FitUniform(
                     crop.PixelWidth,
                     crop.PixelHeight,
@@ -111,6 +111,8 @@ public static class IconAppearanceService
             analysis.EdgeOpacity,
             analysis.RoundedFit.MissingInside,
             analysis.RoundedFit.OutsideLeak,
+            analysis.HasSmallInnerContent,
+            analysis.ContentBounds,
             processed.Size);
     }
 
@@ -137,6 +139,14 @@ public static class IconAppearanceService
         return settings.IconTreatmentMode == IconTreatmentMode.Unified
             && !analysis.NeedsBacking
             && (analysis.IsFullBleed || analysis.IsRoundedSquare);
+    }
+
+    private static Rect CreateOverscanRect()
+    {
+        const double overscan = 92.0 / 88.0;
+        var size = OutputSize * overscan;
+        var offset = (OutputSize - size) / 2;
+        return new Rect(offset, offset, size, size);
     }
 
     private static BitmapSource ClipToUnifiedFrame(BitmapSource source)
@@ -258,15 +268,21 @@ public static class IconAppearanceService
             && !circleLike)
             || internalSquare;
         var organicShape = circleLike || (transparentCorners && fillRatio < 0.84);
-        var hasSmallInnerContent = IsSmallInnerContent(innerContent, source.PixelWidth, source.PixelHeight);
+        var rescueContent = fillRatio <= 0.36 && roundedFit.MissingInside >= 0.34
+            ? GetSalientContentBounds(pixels, stride, source.PixelWidth, source.PixelHeight)
+            : null;
+        var contentForCrop = IsSmallInnerContent(innerContent, source.PixelWidth, source.PixelHeight)
+            ? innerContent
+            : rescueContent;
+        var hasSmallInnerContent = IsSmallInnerContent(contentForCrop, source.PixelWidth, source.PixelHeight);
         var needsBacking = organicShape
             || hasSmallInnerContent
             || !squareAspect
             || (!fullBleed && !roundedSquare && (fillRatio < 0.82 || canvasRatio < 0.84));
 
         var dominant = Color.FromRgb((byte)(red / opaque), (byte)(green / opaque), (byte)(blue / opaque));
-        var crop = hasSmallInnerContent && innerContent.HasValue
-            ? ExpandRect(innerContent.Value, source.PixelWidth, source.PixelHeight, 4)
+        var crop = hasSmallInnerContent && contentForCrop.HasValue
+            ? ExpandRect(contentForCrop.Value, source.PixelWidth, source.PixelHeight, 4)
             : ExpandRect(new Int32Rect(minX, minY, boundsWidth, boundsHeight), source.PixelWidth, source.PixelHeight, needsBacking ? 2 : 0);
 
         return new IconAnalysis(
@@ -339,6 +355,57 @@ public static class IconAppearanceService
         return new Int32Rect(minX, minY, maxX - minX + 1, maxY - minY + 1);
     }
 
+    private static Int32Rect? GetSalientContentBounds(byte[] pixels, int stride, int width, int height)
+    {
+        var background = EstimateInteriorBackgroundColor(pixels, stride, width, height)
+            ?? EstimateEdgeColor(pixels, stride, width, height);
+        if (!background.HasValue) return null;
+
+        var backgroundColor = background.Value;
+        var backgroundLuma = GetLuma(backgroundColor.R, backgroundColor.G, backgroundColor.B);
+        var backgroundChroma = GetChroma(backgroundColor.R, backgroundColor.G, backgroundColor.B);
+        var margin = Math.Max(4, Math.Min(width, height) / 9);
+        var minX = width;
+        var minY = height;
+        var maxX = 0;
+        var maxY = 0;
+        var count = 0;
+
+        for (var y = margin; y < height - margin; y++)
+        {
+            for (var x = margin; x < width - margin; x++)
+            {
+                var index = y * stride + x * 4;
+                if (pixels[index + 3] < 40) continue;
+
+                var blue = pixels[index];
+                var green = pixels[index + 1];
+                var red = pixels[index + 2];
+                var distance = ColorDistance(red, green, blue, backgroundColor);
+                var lumaDelta = Math.Abs(GetLuma(red, green, blue) - backgroundLuma);
+                var chromaDelta = GetChroma(red, green, blue) - backgroundChroma;
+
+                if (distance < 42 && lumaDelta < 28 && chromaDelta < 24) continue;
+                if (GetLuma(red, green, blue) <= 36 && GetChroma(red, green, blue) <= 22) continue;
+
+                minX = Math.Min(minX, x);
+                minY = Math.Min(minY, y);
+                maxX = Math.Max(maxX, x);
+                maxY = Math.Max(maxY, y);
+                count++;
+            }
+        }
+
+        if (count < 8) return null;
+
+        var rect = new Int32Rect(minX, minY, maxX - minX + 1, maxY - minY + 1);
+        var maxRatio = Math.Max(rect.Width / (double)width, rect.Height / (double)height);
+        var minRatio = Math.Min(rect.Width / (double)width, rect.Height / (double)height);
+        return maxRatio is >= 0.04 and <= 0.64 && minRatio >= 0.04
+            ? rect
+            : null;
+    }
+
     private static Color? EstimateEdgeColor(byte[] pixels, int stride, int width, int height)
     {
         long red = 0;
@@ -368,14 +435,58 @@ public static class IconAppearanceService
         return Color.FromRgb((byte)(red / count), (byte)(green / count), (byte)(blue / count));
     }
 
+    private static Color? EstimateInteriorBackgroundColor(byte[] pixels, int stride, int width, int height)
+    {
+        long red = 0;
+        long green = 0;
+        long blue = 0;
+        var count = 0;
+        var margin = Math.Max(4, Math.Min(width, height) / 6);
+
+        for (var y = margin; y < height - margin; y++)
+        {
+            for (var x = margin; x < width - margin; x++)
+            {
+                var index = y * stride + x * 4;
+                if (pixels[index + 3] < 180) continue;
+
+                var pixelBlue = pixels[index];
+                var pixelGreen = pixels[index + 1];
+                var pixelRed = pixels[index + 2];
+                var luma = GetLuma(pixelRed, pixelGreen, pixelBlue);
+                var chroma = GetChroma(pixelRed, pixelGreen, pixelBlue);
+                if (luma > 74 || chroma > 34) continue;
+
+                red += pixelRed;
+                green += pixelGreen;
+                blue += pixelBlue;
+                count++;
+            }
+        }
+
+        if (count < 24) return null;
+
+        return Color.FromRgb((byte)(red / count), (byte)(green / count), (byte)(blue / count));
+    }
+
     private static bool LooksLikePaddingBackground(Color color)
     {
-        var max = Math.Max(color.R, Math.Max(color.G, color.B));
-        var min = Math.Min(color.R, Math.Min(color.G, color.B));
-        var luma = color.R * 0.2126 + color.G * 0.7152 + color.B * 0.0722;
-        var chroma = max - min;
+        var luma = GetLuma(color.R, color.G, color.B);
+        var chroma = GetChroma(color.R, color.G, color.B);
 
         return chroma <= 40 || luma <= 48 || luma >= 210;
+    }
+
+    private static double GetLuma(byte red, byte green, byte blue)
+    {
+        return red * 0.2126 + green * 0.7152 + blue * 0.0722;
+    }
+
+    private static int GetChroma(byte red, byte green, byte blue)
+    {
+        var max = Math.Max(red, Math.Max(green, blue));
+        var min = Math.Min(red, Math.Min(green, blue));
+        return max - min;
     }
 
     private static double ColorDistance(byte red, byte green, byte blue, Color background)
@@ -817,4 +928,6 @@ public sealed record IconDebugInfo(
     double EdgeOpacity,
     double MissingInside,
     double OutsideLeak,
+    bool HasSmallInnerContent,
+    Int32Rect ContentBounds,
     double IconSize);
