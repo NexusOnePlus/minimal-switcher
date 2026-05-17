@@ -35,8 +35,8 @@ To require manual approval before publishing, create a GitHub Environment named 
 
 ## Installer Features
 
-- Installs per-user by default unless the user chooses elevation.
+- Installs with administrator privileges.
 - Uses the app icon from `Assets/AppIcon.ico`.
 - Optional desktop shortcut.
-- Optional startup entry in `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
+- Optional startup task in Windows Task Scheduler using the current interactive user and highest privileges.
 - Launches Minimal Switcher after install unless running silently.

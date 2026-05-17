@@ -55,6 +55,7 @@ Name: "startup"; Description: "Iniciar Minimal Switcher con Windows con privileg
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "StartupTask.ps1"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
@@ -62,13 +63,13 @@ Name: "{group}\Desinstalar {#MyAppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
-Filename: "{sys}\schtasks.exe"; Parameters: "/Create /TN ""{#MyTaskName}"" /TR ""\""{app}\{#MyAppExeName}\"""" /SC ONLOGON /RL HIGHEST /F"; Flags: runhidden; Tasks: startup
-Filename: "{sys}\schtasks.exe"; Parameters: "/Delete /TN ""{#MyTaskName}"" /F"; Flags: runhidden; Tasks: not startup
-Filename: "{sys}\schtasks.exe"; Parameters: "/Run /TN ""{#MyTaskName}"""; Description: "Iniciar {#MyAppName}"; Flags: nowait postinstall skipifsilent runhidden; Tasks: startup
+Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""{app}\StartupTask.ps1"" -Mode Install -ExePath ""{app}\{#MyAppExeName}"""; Flags: runhidden; Tasks: startup
+Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""{app}\StartupTask.ps1"" -Mode Uninstall"; Flags: runhidden; Tasks: not startup
+Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""{app}\StartupTask.ps1"" -Mode Run"; Description: "Iniciar {#MyAppName}"; Flags: nowait postinstall skipifsilent runhidden; Tasks: startup
 Filename: "{app}\{#MyAppExeName}"; Description: "Iniciar {#MyAppName}"; Flags: nowait postinstall skipifsilent; Tasks: not startup
 
 [UninstallRun]
-Filename: "{sys}\schtasks.exe"; Parameters: "/Delete /TN ""{#MyTaskName}"" /F"; Flags: runhidden
+Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""{app}\StartupTask.ps1"" -Mode Uninstall"; Flags: runhidden
 
 [Code]
 function InitializeSetup(): Boolean;
